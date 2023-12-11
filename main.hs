@@ -1,3 +1,4 @@
+import Data.List
 -- PFL 2023/24 - Haskell practical assignment quickstart
 
 -- Part 1
@@ -9,20 +10,49 @@ data Inst =
   deriving Show
 type Code = [Inst]
 
--- createEmptyStack :: Stack
-createEmptyStack = undefined -- TODO, Uncomment the function signature after defining Stack
+data StackData = I Integer | B Bool deriving Show
+type Stack = [StackData]
 
--- stack2Str :: Stack -> String
-stack2Str = undefined -- TODO, Uncomment all the other function type declarations as you implement them
+-- create type StateData and State, where state is a hashmap which the key is a string and the value is a value from StackData
+type StateData = (String, StackData)
+type State = [StateData]
 
--- createEmptyState :: State
-createEmptyState = undefined -- TODO, Uncomment the function signature after defining State
+createEmptyStack :: Stack
+createEmptyStack = []
 
--- state2Str :: State -> String
-state2Str = undefined -- TODO
+stack2Str :: Stack -> String
+stack2Str [] = ""
+stack2Str (h:t) = case h of
+    I i -> show i ++ "," ++ stack2Str t
+    B b -> show b ++ "," ++ stack2Str t
 
--- run :: (Code, Stack, State) -> (Code, Stack, State)
-run = undefined -- TODO
+createEmptyState :: State
+createEmptyState = []
+
+orderState :: State -> State
+orderState [] = []
+orderState s = sort s 
+
+state2Str :: State -> String
+state2Str [] = ""
+state2Str s = 
+    show (var, value) ++ "," state2Str t
+    where ((var,value) : t) = orderState s
+
+run :: (Code, Stack, State) -> (Code, Stack, State)
+run ([], stack, state) = ([], stack, state)
+run (inst : code, stack, state)
+  | inst == Push  = run (code, push (top stack + top (pop stack)) (pop (pop stack)), state)
+  | inst == Add = run (code, push (top stack + top (pop stack)) (pop (pop stack)), state)
+  | inst == Mult = run (code, push (top stack * top (pop stack)) (pop (pop stack)), state)
+  | inst == Sub = run (code, push (top stack - top (pop stack)) (pop (pop stack)), state)
+  | inst == Tru = run (code, push True stack, state)
+  | inst == Fals = run (code, push False stack, state)
+  | inst == Equ = run (code, push (top stack == top (pop stack) (pop (pop stack)), state)
+  | inst == Le = run (code, push (top stack <= top (pop stack)) (pop (pop stack)), state)
+  | inst == And = run (code, push (top stack <= top (pop stack) (pop (pop stack))), state)
+  | inst == Neg = run (code, push (not (top stack)) (pop stack)), state)
+
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
