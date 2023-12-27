@@ -48,10 +48,10 @@ run (inst : code, stack, state)
   | inst == Sub = run (code, push (top stack - top (pop stack)) (pop (pop stack)), state)
   | inst == Tru = run (code, push True stack, state)
   | inst == Fals = run (code, push False stack, state)
-  | inst == Equ = run (code, push (top stack == top (pop stack) (pop (pop stack)), state)
+  | inst == Equ = run (code, push (top stack == top (pop stack) (pop (pop stack)), state))
   | inst == Le = run (code, push (top stack <= top (pop stack)) (pop (pop stack)), state)
   | inst == And = run (code, push (top stack <= top (pop stack) (pop (pop stack))), state)
-  | inst == Neg = run (code, push (not (top stack)) (pop stack)), state)
+  | inst == Neg = run (code, push (not (top stack)) (pop stack), state)
 
 
 -- To help you test your assembler
