@@ -5,6 +5,7 @@ import Data.List
 -- Part 1
 
 -- Do not modify our definition of Inst and Code
+
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
@@ -20,8 +21,23 @@ instance Ord StackData where
   compare (I _) (B _) = LT
   compare (B _) (I _) = GT
 
+push :: StackData -> Stack -> Stack
+push val stack = val : stack
+
+pop :: Stack -> Stack
+pop [] = error "Stack is empty"
+pop (h:t) = t
+
+top :: Stack -> StackData
+top [] = error "Stack is empty"
+top (h:t) = h
+
 type StateData = (String, StackData)
 type State = [StateData]
+
+fetch :: String -> State -> StackData
+fetch var [] = error "Variable not defined"
+fetch var ((var', value) : t) = if var == var' then value else fetch var t
 
 createEmptyStack :: Stack
 createEmptyStack = []
@@ -51,9 +67,9 @@ run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state)
   | Push n <- inst = run (code, I n : stack, state)
-  | Add <- inst = run (code, runBinaryOp (+) stack, state)
-  | Mult <- inst = run (code, runBinaryOp (*) stack, state)
-  | Sub <- inst = run (code, runBinaryOp (-) stack, state)
+  | Add <- inst = run (code, runBinaryIntOp (+) stack, state)
+  | Mult <- inst = run (code, runBinaryIntOp (*) stack, state)
+  | Sub <- inst = run (code, runBinaryIntOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
   | Equ <- inst = run (code, runBinaryBoolOp (==) stack, state)
@@ -67,22 +83,21 @@ run (inst : code, stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
 
   where
-    runBinaryOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
-    runBinaryOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
-    runBinaryOp op _ = error "Run-time error"
+    runBinaryIntOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
+    runBinaryIntOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
+    runBinaryIntOp op _ = error "Invalid integer binary operation"
 
     runBinaryBoolOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
     runBinaryBoolOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
-    runBinaryBoolOp op _ = error "Run-time error"
+    runBinaryBoolOp op _ = error "Invalid boolean binary operation"
 
     runUnaryOp :: (Bool -> Bool) -> Stack -> Stack
     runUnaryOp op (B b : stack) = B (op b) : stack
-    runUnaryOp op _ = error "Run-time error"
+    runUnaryOp op _ = error "Invalid unary operation"
 
     fetch :: String -> State -> StackData
     fetch var [] = error "Run-time error"
     fetch var ((var', value) : t) = if var == var' then value else fetch var t
-
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
 -- run ([], stack, state) = ([], stack, state)
@@ -103,23 +118,6 @@ run (inst : code, stack, state)
 --   | Branch code1 code2 <- inst = if top stack then run (code1 ++ code, pop stack, state) else run (code2 ++ code, pop stack, state)
 --   | Loop code1 code2 <- inst = run (code1 ++ [Branch [code2, Loop code1 code2] [Noop]] ++ code, stack, state)
 --   | otherwise = error "Run-time error"
-
---   where
---     push :: StackData -> Stack -> Stack
---     push val stack = val : stack
-
---     pop :: Stack -> Stack
---     pop [] = error "Run-time error"
---     pop (h:t) = t
-
---     top :: Stack -> StackData
---     top [] = error "Run-time error"
---     top (h:t) = h
-
---     fetch :: String -> State -> StackData
---     fetch var [] = error "Run-time error"
---     fetch var ((var', value) : t) = if var == var' then value else fetch var t
-
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
