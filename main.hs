@@ -18,25 +18,25 @@ type Stack = [StackData]
 instance Ord StackData where
   compare (I n1) (I n2) = compare n1 n2
   compare (B b1) (B b2) = compare b1 b2
-  compare (I _) (B _) = error "Invalid comparison"
-  compare (B _) (I _) = error "Invalid comparison"
+  compare (I _) (B _) = error "Run-time error"
+  compare (B _) (I _) = error "Run-time error"
 
 push :: StackData -> Stack -> Stack
 push val stack = val : stack
 
 pop :: Stack -> Stack
-pop [] = error "Stack is empty"
+pop [] = error "Run-time error"
 pop (h:t) = t
 
 top :: Stack -> StackData
-top [] = error "Stack is empty"
+top [] = error "Run-time error"
 top (h:t) = h
 
 type StateData = (String, StackData)
 type State = [StateData]
 
 fetch :: String -> State -> StackData
-fetch var [] = error "Variable not defined"
+fetch var [] = error "Run-time error"
 fetch var ((var', value) : t) = if var == var' then value else fetch var t
 
 createEmptyStack :: Stack
@@ -98,19 +98,19 @@ run (inst : code, stack, state)
   where
     runArithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
     runArithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
-    runArithmeticOp op _ = error "Invalid arithmetic operation"
+    runArithmeticOp op _ = error "Run-time error"
 
     runComparisonOp :: (Integer -> Integer -> Bool) -> Stack -> Stack
     runComparisonOp op (I n1 : I n2 : stack) = B (n1 `op` n2) : stack
-    runComparisonOp op _ = error "Invalid arithmetic operation"
+    runComparisonOp op _ = error "Run-time error"
 
     runBinaryBoolOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
     runBinaryBoolOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
-    runBinaryBoolOp op _ = error "Invalid boolean binary operation"
+    runBinaryBoolOp op _ = error "Run-time error"
 
     runUnaryOp :: (Bool -> Bool) -> Stack -> Stack
     runUnaryOp op (B b : stack) = B (op b) : stack
-    runUnaryOp op _ = error "Invalid unary operation"
+    runUnaryOp op _ = error "Run-time error"
 
     store :: String -> StackData -> State -> State
     store var value [] = [(var, value)]
