@@ -1,7 +1,6 @@
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-import Data.List
-
 -- PFL 2023/24 - Haskell practical assignment quickstart
+
+import Data.List
 
 -- Part 1
 
@@ -28,7 +27,9 @@ createEmptyStack :: Stack
 createEmptyStack = []
 
 stack2Str :: Stack -> String
-stack2Str [] = ""
+stack2Str [h] = case h of
+    I i -> show i
+    B b -> show b
 stack2Str (h:t) = case h of
     I i -> show i ++ "," ++ stack2Str t
     B b -> show b ++ "," ++ stack2Str t
