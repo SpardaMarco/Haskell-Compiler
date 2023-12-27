@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 import Data.List
 
 -- PFL 2023/24 - Haskell practical assignment quickstart
@@ -63,7 +64,6 @@ run (inst : code, stack, state)
   | Noop <- inst = run (code, stack, state)
   | Branch code1 code2 <- inst = if head stack == B True then run (code1 ++ code, tail stack, state) else run (code2 ++ code, tail stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
-  | otherwise = error "Run-time error"
 
   where
     runBinaryOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
