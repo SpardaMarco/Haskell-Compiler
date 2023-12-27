@@ -11,8 +11,8 @@ data Inst =
   deriving Show
 type Code = [Inst]
 
-data StackData = 
-  I Integer | B Bool 
+data StackData =
+  I Integer | B Bool
   deriving (Show, Eq)
 type Stack = [StackData]
 
@@ -91,7 +91,7 @@ run (inst : code, stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
 
   where
-    
+
     arithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
     arithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
     arithmeticOp op _ = error "Run-time error"
@@ -136,16 +136,45 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 -- Part 2
 
--- TODO: Define the types Aexp, Bexp, Stm and Program
+data Aexp =
+  AddAx Aexp Aexp | MultAx Aexp Aexp | SubAx Aexp Aexp |
+  NumAx Integer
+  deriving (Eq, Show)
 
--- compA :: Aexp -> Code
-compA = undefined -- TODO
+data Bexp =
+  AndBx Bexp Bexp | EqBx Bexp Bexp | EqAx Aexp Aexp | NegBx Bexp | LeqAx Aexp Aexp |
+  Bx Bool
+  deriving (Eq, Show)
 
--- compB :: Bexp -> Code
-compB = undefined -- TODO
+data Stm =
+  AssignBx String Bexp | AssignAx String Aexp |
+  Conditional Bexp Program Program |
+  While Bexp Program
+  deriving (Show)
+type Program = [Stm]
 
--- compile :: Program -> Code
-compile = undefined -- TODO
+compA :: Aexp -> Code
+compA aexp
+  | (AddAx aexp1 aexp2) <- aexp = compA aexp2 ++ compA aexp1 ++ [Add]
+  | (SubAx aexp1 aexp2) <- aexp = compA aexp2 ++ compA aexp1 ++ [Sub]
+  | (MultAx aexp1 aexp2) <- aexp = compA aexp2 ++ compA aexp1 ++ [Mult]
+  | (NumAx n) <- aexp = [Push n]
+
+compB :: Bexp -> Code
+compB bexp
+  | (AndBx b1 b2) <- bexp = compB b2 ++ compB b1 ++ [And]
+  | (EqBx b1 b2) <- bexp = compB b2 ++ compB b1 ++ [Equ]
+  | (EqAx a1 a2) <- bexp = compA a2 ++ compA a1 ++ [Equ]
+  | (NegBx b) <- bexp = compB b ++ [Neg]
+  | (LeqAx a1 a2) <- bexp = compA a2 ++ compA a1 ++ [Le]
+  | (Bx b) <- bexp = if b then [Tru] else [Fals]
+
+compile :: Program -> Code
+compile (stm : program)
+  | (AssignBx var bexp) <- stm = compB bexp ++ [Store var] ++ compile program
+  | (AssignAx var aexp) <- stm = compA aexp ++ [Store var] ++ compile program
+  | (Conditional bexp stm1 stm2) <- stm = compB bexp ++ [Branch (compile stm1) (compile stm2)] ++ compile program
+  | (While bexp stm) <- stm = Loop (compB bexp) (compile stm) : compile program
 
 -- parse :: String -> Program
 parse = undefined -- TODO
@@ -157,7 +186,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
--- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1 else y := 2" == ("","y=2")
+-- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1 else y := 2;" == ("","y=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
