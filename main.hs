@@ -75,15 +75,15 @@ run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state)
   | Push n <- inst = run (code, I n : stack, state)
-  | Add <- inst = run (code, runArithmeticOp (+) stack, state)
-  | Mult <- inst = run (code, runArithmeticOp (*) stack, state)
-  | Sub <- inst = run (code, runArithmeticOp (-) stack, state)
+  | Add <- inst = run (code, arithmeticOp (+) stack, state)
+  | Mult <- inst = run (code, arithmeticOp (*) stack, state)
+  | Sub <- inst = run (code, arithmeticOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
-  | Equ <- inst = run (code, runLogicalOp (==) stack, state)
-  | Le <- inst = run (code, runComparisonOp (<=) stack, state)
-  | And <- inst = run (code, runLogicalOp (&&) stack, state)
-  | Neg <- inst = run (code, runUnaryOp not stack, state)
+  | Equ <- inst = run (code, comparisonOp (==) stack, state)
+  | Le <- inst = run (code, comparisonOp (<=) stack, state)
+  | And <- inst = run (code, logicalOp (&&) stack, state)
+  | Neg <- inst = run (code, unaryOp not stack, state)
   | Fetch var <- inst = run (code, fetch var state : stack, state)
   | Store var <- inst = run (code, tail stack, store var (head stack) state)
   | Noop <- inst = run (code, stack, state)
@@ -92,21 +92,22 @@ run (inst : code, stack, state)
 
   where
     
-    runArithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
-    runArithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
-    runArithmeticOp op _ = error "Run-time error"
+    arithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
+    arithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
+    arithmeticOp op _ = error "Run-time error"
 
-    runComparisonOp :: (Integer -> Integer -> Bool) -> Stack -> Stack
-    runComparisonOp op (I n1 : I n2 : stack) = B (n1 `op` n2) : stack
-    runComparisonOp op _ = error "Run-time error"
+    comparisonOp :: (StackData -> StackData -> Bool) -> Stack -> Stack
+    comparisonOp op (v1 : v2 : stack) = case (v1, v2) of
+      (I _, B _) -> error "Run-time error"
+      (B _, I _) -> error "Run-time error"
+      _ -> B (v1 `op` v2) : stack
 
-    runLogicalOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
-    runLogicalOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
-    runLogicalOp op _ = error "Run-time error"
+    logicalOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
+    label op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
+    logicalOp op _ = error "Run-time error"
 
-    runUnaryOp :: (Bool -> Bool) -> Stack -> Stack
-    runUnaryOp op (B b : stack) = B (op b) : stack
-    runUnaryOp op _ = error "Run-time error"
+    unaryOp op (B b : stack) = B (op b) : stack
+    unaryOp op _ = error "Run-time error"
 
     store :: String -> StackData -> State -> State
     store var value [] = [(var, value)]
