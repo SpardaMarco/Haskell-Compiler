@@ -13,8 +13,7 @@ type Code = [Inst]
 data StackData = I Integer | B Bool deriving Show
 type Stack = [StackData]
 
--- create type StateData and State, where state is a hashmap which the key is a string and the value is a value from StackData
-type StateData = (String, StackData)
+type StateData = (String, StackData) 
 type State = [StateData]
 
 createEmptyStack :: Stack
@@ -31,33 +30,94 @@ createEmptyState = []
 
 orderState :: State -> State
 orderState [] = []
-orderState s = sort s 
+orderState s = sort s
 
 state2Str :: State -> String
 state2Str [] = ""
-state2Str s = 
-    show (var, value) ++ "," state2Str t
+state2Str s =
+    show (var, value) ++ "," ++ state2Str t
     where ((var,value) : t) = orderState s
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state)
-  | inst == Push  = run (code, push (top stack + top (pop stack)) (pop (pop stack)), state)
-  | inst == Add = run (code, push (top stack + top (pop stack)) (pop (pop stack)), state)
-  | inst == Mult = run (code, push (top stack * top (pop stack)) (pop (pop stack)), state)
-  | inst == Sub = run (code, push (top stack - top (pop stack)) (pop (pop stack)), state)
-  | inst == Tru = run (code, push True stack, state)
-  | inst == Fals = run (code, push False stack, state)
-  | inst == Equ = run (code, push (top stack == top (pop stack) (pop (pop stack)), state)
-  | inst == Le = run (code, push (top stack <= top (pop stack)) (pop (pop stack)), state)
-  | inst == And = run (code, push (top stack <= top (pop stack) (pop (pop stack))), state)
-  | inst == Neg = run (code, push (not (top stack)) (pop stack)), state)
+  | Push n <- inst = run (code, I n : stack, state)
+  | Add <- inst = run (code, runBinaryOp (+) stack, state)
+  | Mult <- inst = run (code, runBinaryOp (*) stack, state)
+  | Sub <- inst = run (code, runBinaryOp (-) stack, state)
+  | Tru <- inst = run (code, B True : stack, state)
+  | Fals <- inst = run (code, B False : stack, state)
+  | Equ <- inst = run (code, runBinaryBoolOp (==) stack, state)
+  | Le <- inst = run (code, runBinaryBoolOp (<=) stack, state)
+  | And <- inst = run (code, runBinaryBoolOp (&&) stack, state)
+  | Neg <- inst = run (code, runUnaryOp not stack, state)
+  | Fetch var <- inst = run (code, fetch var state : stack, state)
+  | Store var <- inst = run (code, stack, (var, head stack) : state)
+  | Noop <- inst = run (code, stack, state)
+  | Branch code1 code2 <- inst = if head stack == B True then run (code1 ++ code, tail stack, state) else run (code2 ++ code, tail stack, state)
+  | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
+  | otherwise = error "Run-time error"
+
+  where
+    runBinaryOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
+    runBinaryOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
+    runBinaryOp op _ = error "Run-time error"
+
+    runBinaryBoolOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
+    runBinaryBoolOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
+    runBinaryBoolOp op _ = error "Run-time error"
+
+    runUnaryOp :: (Bool -> Bool) -> Stack -> Stack
+    runUnaryOp op (B b : stack) = B (op b) : stack
+    runUnaryOp op _ = error "Run-time error"
+
+    fetch :: String -> State -> StackData
+    fetch var [] = error "Run-time error"
+    fetch var ((var', value) : t) = if var == var' then value else fetch var t
+
+
+-- run :: (Code, Stack, State) -> (Code, Stack, State)
+-- run ([], stack, state) = ([], stack, state)
+-- run (inst : code, stack, state)
+--   | Push n <- inst = run (code, push (I n) stack, state)
+--   | Add <- inst = run (code, push (I (top stack + top (pop stack))) (pop (pop stack)), state)
+--   | Mult <- inst = run (code, push (I (top stack * top (pop stack))) (pop (pop stack)), state)
+--   | Sub <- inst = run (code, push (I (top stack - top (pop stack))) (pop (pop stack)), state)
+--   | Tru <- inst = run (code, push (B True) stack, state)
+--   | Fals <- inst = run (code, push (B False) stack, state)
+--   | Equ <- inst = run (code, push (B (top stack == top (pop stack))) (pop (pop stack)), state)
+--   | Le <- inst = run (code, push (B (top stack <= top (pop stack))) (pop (pop stack)), state)
+--   | And <- inst = run (code, push (B (top stack && top (pop stack))) (pop (pop stack)), state)
+--   | Neg <- inst = run (code, push (B (not (top stack))) (pop stack), state)
+--   | Fetch var <- inst = run (code, push (fetch var state) stack, state)
+--   | Store var <- inst = run (code, stack, (var, top stack) : state)
+--   | Noop <- inst = run (code, stack, state)
+--   | Branch code1 code2 <- inst = if top stack then run (code1 ++ code, pop stack, state) else run (code2 ++ code, pop stack, state)
+--   | Loop code1 code2 <- inst = run (code1 ++ [Branch [code2, Loop code1 code2] [Noop]] ++ code, stack, state)
+--   | otherwise = error "Run-time error"
+
+--   where
+--     push :: StackData -> Stack -> Stack
+--     push val stack = val : stack
+
+--     pop :: Stack -> Stack
+--     pop [] = error "Run-time error"
+--     pop (h:t) = t
+
+--     top :: Stack -> StackData
+--     top [] = error "Run-time error"
+--     top (h:t) = h
+
+--     fetch :: String -> State -> StackData
+--     fetch var [] = error "Run-time error"
+--     fetch var ((var', value) : t) = if var == var' then value else fetch var t
 
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
+  where (_,stack,state) = run (code, createEmptyStack, createEmptyState)
+
 
 -- Examples:
 -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
@@ -69,6 +129,7 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- testAssembler [Push (-20),Push (-21), Le] == ("True","")
 -- testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
 -- testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+-- testAssembler [Push 1,Push 2,And] == "Run-time error"
 
 -- Part 2
 
@@ -89,7 +150,7 @@ parse = undefined -- TODO
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
+  where (_,stack,state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
