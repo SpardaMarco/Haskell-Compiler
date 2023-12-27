@@ -106,6 +106,7 @@ run (inst : code, stack, state)
     label op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
     logicalOp op _ = error "Run-time error"
 
+    unaryOp :: (Bool -> Bool) -> Stack -> Stack
     unaryOp op (B b : stack) = B (op b) : stack
     unaryOp op _ = error "Run-time error"
 
