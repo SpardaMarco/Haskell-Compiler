@@ -18,8 +18,8 @@ type Stack = [StackData]
 instance Ord StackData where
   compare (I n1) (I n2) = compare n1 n2
   compare (B b1) (B b2) = compare b1 b2
-  compare (I _) (B _) = LT
-  compare (B _) (I _) = GT
+  compare (I _) (B _) = error "Invalid comparison"
+  compare (B _) (I _) = error "Invalid comparison"
 
 push :: StackData -> Stack -> Stack
 push val stack = val : stack
@@ -43,6 +43,7 @@ createEmptyStack :: Stack
 createEmptyStack = []
 
 stack2Str :: Stack -> String
+stack2Str [] = ""
 stack2Str [h] = case h of
     I i -> show i
     B b -> show b
@@ -57,35 +58,51 @@ orderState :: State -> State
 orderState [] = []
 orderState s = sort s
 
+state2StrAux :: State -> String
+state2StrAux [] = ""
+state2StrAux [(var, value)] = case value of
+    I i -> var ++ "=" ++ show i
+    B b -> var ++ "=" ++ show b
+state2StrAux ((var, value) : state) = case value of
+    I i -> var ++ "=" ++ show i ++ "," ++ state2StrAux state
+    B b -> var ++ "=" ++ show b ++ "," ++ state2StrAux state
+
 state2Str :: State -> String
-state2Str [] = ""
-state2Str s =
-    show (var, value) ++ "," ++ state2Str t
-    where ((var,value) : t) = orderState s
+state2Str state = state2StrAux (orderState state)
+
+-- state2Str :: State -> String
+-- state2Str [] = ""
+-- state2Str s =
+--     show (var ++ "=" ++ value) ++ "," ++ state2Str t
+--     where ((var,value) : t) = orderState s
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state)
   | Push n <- inst = run (code, I n : stack, state)
-  | Add <- inst = run (code, runBinaryIntOp (+) stack, state)
-  | Mult <- inst = run (code, runBinaryIntOp (*) stack, state)
-  | Sub <- inst = run (code, runBinaryIntOp (-) stack, state)
+  | Add <- inst = run (code, runArithmeticOp (+) stack, state)
+  | Mult <- inst = run (code, runArithmeticOp (*) stack, state)
+  | Sub <- inst = run (code, runArithmeticOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
   | Equ <- inst = run (code, runBinaryBoolOp (==) stack, state)
-  | Le <- inst = run (code, runBinaryBoolOp (<=) stack, state)
+  | Le <- inst = run (code, runComparisonOp (<=) stack, state)
   | And <- inst = run (code, runBinaryBoolOp (&&) stack, state)
   | Neg <- inst = run (code, runUnaryOp not stack, state)
   | Fetch var <- inst = run (code, fetch var state : stack, state)
-  | Store var <- inst = run (code, tail stack, (var, head stack) : state)
+  | Store var <- inst = run (code, tail stack, store var (head stack) state)
   | Noop <- inst = run (code, stack, state)
   | Branch code1 code2 <- inst = if head stack == B True then run (code1 ++ code, tail stack, state) else run (code2 ++ code, tail stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
 
   where
-    runBinaryIntOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
-    runBinaryIntOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
-    runBinaryIntOp op _ = error "Invalid integer binary operation"
+    runArithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
+    runArithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
+    runArithmeticOp op _ = error "Invalid arithmetic operation"
+
+    runComparisonOp :: (Integer -> Integer -> Bool) -> Stack -> Stack
+    runComparisonOp op (I n1 : I n2 : stack) = B (n1 `op` n2) : stack
+    runComparisonOp op _ = error "Invalid arithmetic operation"
 
     runBinaryBoolOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
     runBinaryBoolOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
@@ -95,9 +112,14 @@ run (inst : code, stack, state)
     runUnaryOp op (B b : stack) = B (op b) : stack
     runUnaryOp op _ = error "Invalid unary operation"
 
-    fetch :: String -> State -> StackData
-    fetch var [] = error "Run-time error"
-    fetch var ((var', value) : t) = if var == var' then value else fetch var t
+    store :: String -> StackData -> State -> State
+    store var value [] = [(var, value)]
+    store var value ((var', value') : state) =
+    | var == var' then
+        (var', value) : state
+      else
+        (var', value') : store var value state
+
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
 -- run ([], stack, state) = ([], stack, state)
@@ -123,7 +145,6 @@ run (inst : code, stack, state)
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where (_,stack,state) = run (code, createEmptyStack, createEmptyState)
-
 
 -- Examples:
 -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
@@ -156,7 +177,7 @@ parse = undefined -- TODO
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
+  where (_, stack, state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
