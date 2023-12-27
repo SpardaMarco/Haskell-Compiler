@@ -114,11 +114,9 @@ run (inst : code, stack, state)
 
     store :: String -> StackData -> State -> State
     store var value [] = [(var, value)]
-    store var value ((var', value') : state) =
-    | var == var' then
-        (var', value) : state
-      else
-        (var', value') : store var value state
+    store var value ((var', value') : state)
+      | var == var' = (var', value) : state
+      | otherwise = (var', value') : store var value state
 
 
 -- run :: (Code, Stack, State) -> (Code, Stack, State)
