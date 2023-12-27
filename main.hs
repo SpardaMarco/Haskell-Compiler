@@ -1,4 +1,5 @@
 import Data.List
+
 -- PFL 2023/24 - Haskell practical assignment quickstart
 
 -- Part 1
@@ -10,10 +11,16 @@ data Inst =
   deriving Show
 type Code = [Inst]
 
-data StackData = I Integer | B Bool deriving Show
+data StackData = I Integer | B Bool deriving (Show, Eq)
 type Stack = [StackData]
 
-type StateData = (String, StackData) 
+instance Ord StackData where
+  compare (I n1) (I n2) = compare n1 n2
+  compare (B b1) (B b2) = compare b1 b2
+  compare (I _) (B _) = LT
+  compare (B _) (I _) = GT
+
+type StateData = (String, StackData)
 type State = [StateData]
 
 createEmptyStack :: Stack
