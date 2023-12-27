@@ -5,14 +5,15 @@ import Data.List
 -- Part 1
 
 -- Do not modify our definition of Inst and Code
-
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
   deriving Show
 type Code = [Inst]
 
-data StackData = I Integer | B Bool deriving (Show, Eq)
+data StackData = 
+  I Integer | B Bool 
+  deriving (Show, Eq)
 type Stack = [StackData]
 
 instance Ord StackData where
@@ -70,12 +71,6 @@ state2StrAux ((var, value) : state) = case value of
 state2Str :: State -> String
 state2Str state = state2StrAux (orderState state)
 
--- state2Str :: State -> String
--- state2Str [] = ""
--- state2Str s =
---     show (var ++ "=" ++ value) ++ "," ++ state2Str t
---     where ((var,value) : t) = orderState s
-
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state)
@@ -85,9 +80,9 @@ run (inst : code, stack, state)
   | Sub <- inst = run (code, runArithmeticOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
-  | Equ <- inst = run (code, runBinaryBoolOp (==) stack, state)
+  | Equ <- inst = run (code, runLogicalOp (==) stack, state)
   | Le <- inst = run (code, runComparisonOp (<=) stack, state)
-  | And <- inst = run (code, runBinaryBoolOp (&&) stack, state)
+  | And <- inst = run (code, runLogicalOp (&&) stack, state)
   | Neg <- inst = run (code, runUnaryOp not stack, state)
   | Fetch var <- inst = run (code, fetch var state : stack, state)
   | Store var <- inst = run (code, tail stack, store var (head stack) state)
@@ -96,6 +91,7 @@ run (inst : code, stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
 
   where
+    
     runArithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
     runArithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
     runArithmeticOp op _ = error "Run-time error"
@@ -104,9 +100,9 @@ run (inst : code, stack, state)
     runComparisonOp op (I n1 : I n2 : stack) = B (n1 `op` n2) : stack
     runComparisonOp op _ = error "Run-time error"
 
-    runBinaryBoolOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
-    runBinaryBoolOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
-    runBinaryBoolOp op _ = error "Run-time error"
+    runLogicalOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
+    runLogicalOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
+    runLogicalOp op _ = error "Run-time error"
 
     runUnaryOp :: (Bool -> Bool) -> Stack -> Stack
     runUnaryOp op (B b : stack) = B (op b) : stack
@@ -118,26 +114,6 @@ run (inst : code, stack, state)
       | var == var' = (var', value) : state
       | otherwise = (var', value') : store var value state
 
-
--- run :: (Code, Stack, State) -> (Code, Stack, State)
--- run ([], stack, state) = ([], stack, state)
--- run (inst : code, stack, state)
---   | Push n <- inst = run (code, push (I n) stack, state)
---   | Add <- inst = run (code, push (I (top stack + top (pop stack))) (pop (pop stack)), state)
---   | Mult <- inst = run (code, push (I (top stack * top (pop stack))) (pop (pop stack)), state)
---   | Sub <- inst = run (code, push (I (top stack - top (pop stack))) (pop (pop stack)), state)
---   | Tru <- inst = run (code, push (B True) stack, state)
---   | Fals <- inst = run (code, push (B False) stack, state)
---   | Equ <- inst = run (code, push (B (top stack == top (pop stack))) (pop (pop stack)), state)
---   | Le <- inst = run (code, push (B (top stack <= top (pop stack))) (pop (pop stack)), state)
---   | And <- inst = run (code, push (B (top stack && top (pop stack))) (pop (pop stack)), state)
---   | Neg <- inst = run (code, push (B (not (top stack))) (pop stack), state)
---   | Fetch var <- inst = run (code, push (fetch var state) stack, state)
---   | Store var <- inst = run (code, stack, (var, top stack) : state)
---   | Noop <- inst = run (code, stack, state)
---   | Branch code1 code2 <- inst = if top stack then run (code1 ++ code, pop stack, state) else run (code2 ++ code, pop stack, state)
---   | Loop code1 code2 <- inst = run (code1 ++ [Branch [code2, Loop code1 code2] [Noop]] ++ code, stack, state)
---   | otherwise = error "Run-time error"
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
