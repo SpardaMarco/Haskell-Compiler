@@ -1,20 +1,38 @@
 -- PFL 2023/24 - Haskell practical assignment quickstart
 
-import Data.List
 import Data.Char
+import Data.List
+import Distribution.Compat.CharParsing (CharParsing (string))
+import Distribution.Simple.Setup (programDbOptions)
 
 -- Part 1
 
 -- Do not modify our definition of Inst and Code
-data Inst =
-  Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
-  Branch Code Code | Loop Code Code
-  deriving Show
+data Inst
+  = Push Integer
+  | Add
+  | Mult
+  | Sub
+  | Tru
+  | Fals
+  | Equ
+  | Le
+  | And
+  | Neg
+  | Fetch String
+  | Store String
+  | Noop
+  | Branch Code Code
+  | Loop Code Code
+  deriving (Show)
+
 type Code = [Inst]
 
-data StackData =
-  I Integer | B Bool
+data StackData
+  = I Integer
+  | B Bool
   deriving (Show, Eq)
+
 type Stack = [StackData]
 
 instance Ord StackData where
@@ -28,13 +46,14 @@ push val stack = val : stack
 
 pop :: Stack -> Stack
 pop [] = error "Run-time error"
-pop (h:t) = t
+pop (h : t) = t
 
 top :: Stack -> StackData
 top [] = error "Run-time error"
-top (h:t) = h
+top (h : t) = h
 
 type StateData = (String, StackData)
+
 type State = [StateData]
 
 fetch :: String -> State -> StackData
@@ -47,11 +66,11 @@ createEmptyStack = []
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str [h] = case h of
-    I i -> show i
-    B b -> show b
-stack2Str (h:t) = case h of
-    I i -> show i ++ "," ++ stack2Str t
-    B b -> show b ++ "," ++ stack2Str t
+  I i -> show i
+  B b -> show b
+stack2Str (h : t) = case h of
+  I i -> show i ++ "," ++ stack2Str t
+  B b -> show b ++ "," ++ stack2Str t
 
 createEmptyState :: State
 createEmptyState = []
@@ -63,11 +82,11 @@ orderState s = sort s
 state2StrAux :: State -> String
 state2StrAux [] = ""
 state2StrAux [(var, value)] = case value of
-    I i -> var ++ "=" ++ show i
-    B b -> var ++ "=" ++ show b
+  I i -> var ++ "=" ++ show i
+  B b -> var ++ "=" ++ show b
 state2StrAux ((var, value) : state) = case value of
-    I i -> var ++ "=" ++ show i ++ "," ++ state2StrAux state
-    B b -> var ++ "=" ++ show b ++ "," ++ state2StrAux state
+  I i -> var ++ "=" ++ show i ++ "," ++ state2StrAux state
+  B b -> var ++ "=" ++ show b ++ "," ++ state2StrAux state
 
 state2Str :: State -> String
 state2Str state = state2StrAux (orderState state)
@@ -90,9 +109,7 @@ run (inst : code, stack, state)
   | Noop <- inst = run (code, stack, state)
   | Branch code1 code2 <- inst = if head stack == B True then run (code1 ++ code, tail stack, state) else run (code2 ++ code, tail stack, state)
   | Loop code1 code2 <- inst = run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
-
   where
-
     arithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
     arithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
     arithmeticOp op _ = error "Run-time error"
@@ -117,11 +134,11 @@ run (inst : code, stack, state)
       | var == var' = (var', value) : state
       | otherwise = (var', value') : store var value state
 
-
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run (code, createEmptyStack, createEmptyState)
+  where
+    (_, stack, state) = run (code, createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
@@ -137,23 +154,31 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 -- Part 2
 
-data Aexp =
-  AddAx Aexp Aexp | MultAx Aexp Aexp | SubAx Aexp Aexp |
-  NumAx Integer
+data Aexp
+  = AddAx Aexp Aexp
+  | MultAx Aexp Aexp
+  | SubAx Aexp Aexp
+  | NumAx Integer
+  | VarAx String
   deriving (Eq, Show)
 
-data Bexp =
-  AndBx Bexp Bexp | EqBx Bexp Bexp | EqAx Aexp Aexp | NegBx Bexp | LeqAx Aexp Aexp |
-  Bx Bool
+data Bexp
+  = AndBx Bexp Bexp
+  | EqBx Bexp Bexp
+  | EqAx Aexp Aexp
+  | NegBx Bexp
+  | LeqAx Aexp Aexp
+  | Bx Bool
   deriving (Eq, Show)
 
-data Stm =
-  AssignBx String Bexp | AssignAx String Aexp |
-  Conditional Bexp Program Program |
-  While Bexp Program |
-  -- sequence of statements in format (instr1 ; instr2)
-  Seq Stm Stm
+data Stm
+  = AssignBx String Bexp
+  | AssignAx String Aexp
+  | Conditional Bexp Program Program
+  | While Bexp Program
+  | Seq Stm Stm
   deriving (Show)
+
 type Program = [Stm]
 
 compA :: Aexp -> Code
@@ -162,6 +187,7 @@ compA aexp
   | (SubAx aexp1 aexp2) <- aexp = compA aexp2 ++ compA aexp1 ++ [Sub]
   | (MultAx aexp1 aexp2) <- aexp = compA aexp2 ++ compA aexp1 ++ [Mult]
   | (NumAx n) <- aexp = [Push n]
+  | (VarAx v) <- aexp = [Fetch v]
 
 compB :: Bexp -> Code
 compB bexp
@@ -173,6 +199,7 @@ compB bexp
   | (Bx b) <- bexp = if b then [Tru] else [Fals]
 
 compile :: Program -> Code
+compile [] = []
 compile (stm : program)
   | (AssignBx var bexp) <- stm = compB bexp ++ [Store var] ++ compile program
   | (AssignAx var aexp) <- stm = compA aexp ++ [Store var] ++ compile program
@@ -180,16 +207,29 @@ compile (stm : program)
   | (While bexp stm) <- stm = Loop (compB bexp) (compile stm) : compile program
   | (Seq stm1 stm2) <- stm = compile [stm1] ++ compile [stm2] ++ compile program
 
-data Token =
-  TokAssign | TokSemicolon |
-  TokOpenBracket | TokCloseBracket |
-  TokIf | TokThen | TokElse |
-  TokWhile | TokDo |
-  TokNot | TokAnd | TokOr | TokTrue | TokFalse |
-  TokAEq | TokBEq | TokLeq |
-  TokPlus | TokMinus | TokMult |
-  TokNum Integer |
-  TokVar String
+data Token
+  = TokAssign
+  | TokSemicolon
+  | TokOpenBracket
+  | TokCloseBracket
+  | TokIf
+  | TokThen
+  | TokElse
+  | TokWhile
+  | TokDo
+  | TokNot
+  | TokAnd
+  | TokOr
+  | TokTrue
+  | TokFalse
+  | TokAEq
+  | TokBEq
+  | TokLeq
+  | TokPlus
+  | TokMinus
+  | TokMult
+  | TokNum Integer
+  | TokVar String
   deriving (Show, Eq)
 
 lexer :: String -> [Token]
@@ -214,24 +254,97 @@ lexer ('a' : 'n' : 'd' : rest) = TokAnd : lexer rest
 lexer ('o' : 'r' : rest) = TokOr : lexer rest
 lexer ('T' : 'r' : 'u' : 'e' : rest) = TokTrue : lexer rest
 lexer ('F' : 'a' : 'l' : 's' : 'e' : rest) = TokFalse : lexer rest
-lexer str@(c : rest)
+lexer (c : rest)
   | isDigit c = TokNum (read (c : takeWhile isDigit rest)) : lexer (dropWhile isDigit rest)
   | isSpace c = lexer rest
   | isLower c && isAlpha c = TokVar (c : takeWhile isAlphaNum rest) : lexer (dropWhile isAlphaNum rest) -- deviamos aceitar variaveis tipo x12?
   | otherwise = error "Run-time error"
 
--- parse :: String -> Program
-parse = undefined -- TODO
+parseInt :: [Token] -> Maybe (Aexp, [Token])
+parseInt (TokNum n : restTokens) =
+  Just (NumAx n, restTokens)
+parseInt (TokVar v : restTokens) =
+  Just (VarAx v, restTokens)
+parseInt tokens =
+  Nothing
+
+parseProdOrInt :: [Token] -> Maybe (Aexp, [Token])
+parseProdOrInt tokens =
+  case parseInt tokens of
+    Just (expr1, TokMult : restTokens1) -> case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (MultAx expr1 expr2, restTokens2)
+      Nothing -> Nothing
+    result -> result
+
+parseSumOrDiffOrProdOrInt :: [Token] -> Maybe (Aexp, [Token])
+parseSumOrDiffOrProdOrInt tokens =
+  case parseProdOrInt tokens of
+    Just (expr1, TokPlus : restTokens1) -> case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (AddAx expr1 expr2, restTokens2)
+      Nothing -> Nothing
+    Just (expr1, TokMinus : restTokens1) -> case parseProdOrInt restTokens1 of
+      Just (expr2, restTokens2) -> Just (SubAx expr1 expr2, restTokens2)
+      Nothing -> Nothing
+    result -> result
+
+parseIntOrParenExpr :: [Token] -> Maybe (Aexp, [Token])
+parseIntOrParenExpr (TokNum n : restTokens) = Just (NumAx n, restTokens)
+parseIntOrParenExpr (TokVar v : restTokens) = Just (VarAx v, restTokens)
+parseIntOrParenExpr (TokOpenBracket : restTokens1) =
+  case parseSumOrDiffOrProdOrInt restTokens1 of
+    Just (expr, TokCloseBracket : restTokens2) -> Just (expr, restTokens2)
+    Just _ -> Nothing
+    Nothing -> Nothing
+parseIntOrParenExpr tokens = Nothing
+
+parseProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
+parseProdOrIntOrPar tokens =
+  case parseIntOrParenExpr tokens of
+    Just (expr1, TokMult : restTokens1) ->
+      case parseProdOrIntOrPar restTokens1 of
+        Just (expr2, restTokens2) -> Just (MultAx expr1 expr2, restTokens2)
+        Nothing -> Nothing
+    result -> result
+
+parseSumOrDifforProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
+parseSumOrDifforProdOrIntOrPar tokens =
+  case parseProdOrIntOrPar tokens of
+    Just (expr1, TokPlus : restTokens1) ->
+      case parseSumOrDifforProdOrIntOrPar restTokens1 of
+        Just (expr2, restTokens2) -> Just (AddAx expr1 expr2, restTokens2)
+        Nothing -> Nothing
+    Just (expr1, TokMinus : restTokens1) ->
+      case parseSumOrDifforProdOrIntOrPar restTokens1 of
+        Just (expr2, restTokens2) -> Just (SubAx expr1 expr2, restTokens2)
+        Nothing -> Nothing
+    result -> result
+
+buildArithmetic :: [Token] -> Aexp
+buildArithmetic tokens =
+  case parseSumOrDifforProdOrIntOrPar tokens of
+    Just (expr, []) -> expr
+    _ -> error "Run-time error"
+
+buildData :: [Token] -> Program
+buildData [] = []
+buildData tokens
+  | (TokSemicolon : restTokens1) <- tokens = buildData restTokens1
+  | (TokVar var : TokAssign : restTokens1) <- tokens = AssignAx var (buildArithmetic (takeWhile (/= TokSemicolon) restTokens1)) : buildData (dropWhile (/= TokSemicolon) restTokens1)
+
+
+parse :: String -> Program
+parse = buildData . lexer
 
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
-  where (_, stack, state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
+  where
+    (_, stack, state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
 -- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1 else y := 2;" == ("","y=2")
--- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
+-- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1") -- o else devia acabar em ';'?
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
