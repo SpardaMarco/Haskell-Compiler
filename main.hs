@@ -1,6 +1,7 @@
 -- PFL 2023/24 - Haskell practical assignment quickstart
 
 import Data.List
+import Data.Char
 
 -- Part 1
 
@@ -149,7 +150,9 @@ data Bexp =
 data Stm =
   AssignBx String Bexp | AssignAx String Aexp |
   Conditional Bexp Program Program |
-  While Bexp Program
+  While Bexp Program |
+  -- sequence of statements in format (instr1 ; instr2)
+  Seq Stm Stm
   deriving (Show)
 type Program = [Stm]
 
@@ -175,6 +178,47 @@ compile (stm : program)
   | (AssignAx var aexp) <- stm = compA aexp ++ [Store var] ++ compile program
   | (Conditional bexp stm1 stm2) <- stm = compB bexp ++ [Branch (compile stm1) (compile stm2)] ++ compile program
   | (While bexp stm) <- stm = Loop (compB bexp) (compile stm) : compile program
+  | (Seq stm1 stm2) <- stm = compile [stm1] ++ compile [stm2] ++ compile program
+
+data Token =
+  TokAssign | TokSemicolon |
+  TokOpenBracket | TokCloseBracket |
+  TokIf | TokThen | TokElse |
+  TokWhile | TokDo |
+  TokNot | TokAnd | TokOr | TokTrue | TokFalse |
+  TokAEq | TokBEq | TokLeq |
+  TokPlus | TokMinus | TokMult |
+  TokNum Integer |
+  TokVar String
+  deriving (Show, Eq)
+
+lexer :: String -> [Token]
+lexer [] = []
+lexer (':' : '=' : rest) = TokAssign : lexer rest
+lexer ('+' : rest) = TokPlus : lexer rest
+lexer ('-' : rest) = TokMinus : lexer rest
+lexer ('*' : rest) = TokMult : lexer rest
+lexer (';' : rest) = TokSemicolon : lexer rest
+lexer ('(' : rest) = TokOpenBracket : lexer rest
+lexer (')' : rest) = TokCloseBracket : lexer rest
+lexer ('=' : '=' : rest) = TokAEq : lexer rest
+lexer ('<' : '=' : rest) = TokLeq : lexer rest
+lexer ('=' : rest) = TokBEq : lexer rest
+lexer ('i' : 'f' : rest) = TokIf : lexer rest
+lexer ('t' : 'h' : 'e' : 'n' : rest) = TokThen : lexer rest
+lexer ('e' : 'l' : 's' : 'e' : rest) = TokElse : lexer rest
+lexer ('w' : 'h' : 'i' : 'l' : 'e' : rest) = TokWhile : lexer rest
+lexer ('d' : 'o' : rest) = TokDo : lexer rest
+lexer ('n' : 'o' : 't' : rest) = TokNot : lexer rest
+lexer ('a' : 'n' : 'd' : rest) = TokAnd : lexer rest
+lexer ('o' : 'r' : rest) = TokOr : lexer rest
+lexer ('T' : 'r' : 'u' : 'e' : rest) = TokTrue : lexer rest
+lexer ('F' : 'a' : 'l' : 's' : 'e' : rest) = TokFalse : lexer rest
+lexer str@(c : rest)
+  | isDigit c = TokNum (read (c : takeWhile isDigit rest)) : lexer (dropWhile isDigit rest)
+  | isSpace c = lexer rest
+  | isLower c && isAlpha c = TokVar (c : takeWhile isAlphaNum rest) : lexer (dropWhile isAlphaNum rest) -- deviamos aceitar variaveis tipo x12?
+  | otherwise = error "Run-time error"
 
 -- parse :: String -> Program
 parse = undefined -- TODO
