@@ -313,31 +313,30 @@ parseBool (TokVar v : restTokens) = Just (VarBx v, restTokens)
 parseBool tokens =
   case parseSumOrDiffOrProdOrIntOrPar tokens of
     Just (expr1, TokLeq : restTokens1) -> case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (LeqAx expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (LeqAx expr2 expr1, restTokens2)
     Just (expr1, TokAEq : restTokens1) -> case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (EqAx expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (EqAx expr2 expr1, restTokens2)
     Nothing -> Nothing
 
 parseBoolOrParExpr :: [Token] -> Maybe (Bexp, [Token])
-parseBoolOrParExpr (TokOpenBracket : restTokens1) =
+parseBoolOrParExpr (TokCloseBracket : restTokens1) =
   case parseAndOrBEqOrNotOrBoolOrPar restTokens1 of
-    Just (expr, TokCloseBracket : restTokens2) -> Just (expr, restTokens2)
+    Just (expr, TokOpenBracket : restTokens2) -> Just (expr, restTokens2)
     Just _ -> Nothing
     Nothing -> Nothing
 parseBoolOrParExpr tokens = parseBool tokens
 
 parseNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
-parseNotOrBoolOrPar (TokNot : restTokens1) =
-  case parseBoolOrParExpr restTokens1 of
-    Just (expr, restTokens2) -> Just (NegBx expr, restTokens2)
-    Nothing -> Nothing
-parseNotOrBoolOrPar tokens = parseBoolOrParExpr tokens
+parseNotOrBoolOrPar tokens =
+  case parseBoolOrParExpr tokens of
+    Just (expr1, TokNot : restTokens1) -> Just (NegBx expr1, restTokens1)
+    result -> result
 
 parseBEqOrNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseBEqOrNotOrBoolOrPar tokens =
   case parseNotOrBoolOrPar tokens of
     Just (expr1, TokBEq : restTokens1) -> case parseBEqOrNotOrBoolOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (EqBx expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (EqBx expr2 expr1, restTokens2)
       Nothing -> Nothing
     result -> result
 
@@ -345,13 +344,13 @@ parseAndOrBEqOrNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseAndOrBEqOrNotOrBoolOrPar tokens =
   case parseBEqOrNotOrBoolOrPar tokens of
     Just (expr1, TokAnd : restTokens1) -> case parseAndOrBEqOrNotOrBoolOrPar restTokens1 of
-      Just (expr2, restTokens2) -> Just (AndBx expr1 expr2, restTokens2)
+      Just (expr2, restTokens2) -> Just (AndBx expr2 expr1, restTokens2)
       Nothing -> Nothing
     result -> result
 
 buildBool :: [Token] -> Bexp
 buildBool tokens =
-  case parseAndOrBEqOrNotOrBoolOrPar tokens of
+  case parseAndOrBEqOrNotOrBoolOrPar (reverse tokens) of
     Just (expr, []) -> expr
     _ -> error "Run-time error"
 
