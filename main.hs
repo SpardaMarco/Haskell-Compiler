@@ -276,29 +276,10 @@ parseInt (TokVar v : restTokens) =
 parseInt tokens =
   Nothing
 
-parseProdOrInt :: [Token] -> Maybe (Aexp, [Token])
-parseProdOrInt tokens =
-  case parseInt tokens of
-    Just (expr1, TokMult : restTokens1) -> case parseProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (MultAx expr1 expr2, restTokens2)
-      Nothing -> Nothing
-    result -> result
-
-parseSumOrDiffOrProdOrInt :: [Token] -> Maybe (Aexp, [Token])
-parseSumOrDiffOrProdOrInt tokens =
-  case parseProdOrInt tokens of
-    Just (expr1, TokPlus : restTokens1) -> case parseSumOrDiffOrProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (AddAx expr1 expr2, restTokens2)
-      Nothing -> Nothing
-    Just (expr1, TokMinus : restTokens1) -> case parseSumOrDiffOrProdOrInt restTokens1 of
-      Just (expr2, restTokens2) -> Just (SubAx expr1 expr2, restTokens2)
-      Nothing -> Nothing
-    result -> result
-
 parseIntOrParenExpr :: [Token] -> Maybe (Aexp, [Token])
-parseIntOrParenExpr (TokOpenBracket : restTokens1) =
-  case parseSumOrDiffOrProdOrInt restTokens1 of
-    Just (expr, TokCloseBracket : restTokens2) -> Just (expr, restTokens2)
+parseIntOrParenExpr (TokCloseBracket : restTokens1) =
+  case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
+    Just (expr, TokOpenBracket : restTokens2) -> Just (expr, restTokens2)
     Just _ -> Nothing
     Nothing -> Nothing
 parseIntOrParenExpr tokens = parseInt tokens
@@ -308,7 +289,7 @@ parseProdOrIntOrPar tokens =
   case parseIntOrParenExpr tokens of
     Just (expr1, TokMult : restTokens1) ->
       case parseProdOrIntOrPar restTokens1 of
-        Just (expr2, restTokens2) -> Just (MultAx expr1 expr2, restTokens2)
+        Just (expr2, restTokens2) -> Just (MultAx expr2 expr1, restTokens2)
         Nothing -> Nothing
     result -> result
 
@@ -317,13 +298,13 @@ parseSumOrDiffOrProdOrIntOrPar tokens =
   case parseProdOrIntOrPar tokens of
     Just (expr1, TokPlus : restTokens1) ->
       case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
-        Just (expr2, restTokens2) -> Just (AddAx expr1 expr2, restTokens2)
+        Just (expr2, restTokens2) -> Just (AddAx expr2 expr1, restTokens2)
         Nothing -> Nothing
     Just (expr1, TokMinus : restTokens1) ->
       case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
-        Just (expr2, restTokens2) -> Just (SubAx expr1 expr2, restTokens2)
+        Just (expr2, restTokens2) -> Just (SubAx expr2 expr1, restTokens2)
         Nothing -> Nothing
-    result -> result
+    result -> result 
 
 parseBool :: [Token] -> Maybe (Bexp, [Token])
 parseBool (TokTrue : restTokens) = Just (Bx True, restTokens)
@@ -337,35 +318,9 @@ parseBool tokens =
       Just (expr2, restTokens2) -> Just (EqAx expr1 expr2, restTokens2)
     Nothing -> Nothing
 
-parseNotOrBool :: [Token] -> Maybe (Bexp, [Token])
-parseNotOrBool (TokNot : tokens) =
-  case parseBool tokens of
-    Just (expr1, restTokens1) -> Just (NegBx expr1, restTokens1)
-    result -> result
-parseNotOrBool tokens =
-  case parseBool tokens of
-    Just (expr1, restTokens1) -> Just (expr1, restTokens1)
-    result -> result
-
-parseEqOrNotOrBool :: [Token] -> Maybe (Bexp, [Token])
-parseEqOrNotOrBool tokens =
-  case parseNotOrBool tokens of
-    Just (expr1, TokBEq : restTokens1) -> case parseEqOrNotOrBool restTokens1 of
-      Just (expr2, restTokens2) -> Just (EqBx expr1 expr2, restTokens2)
-      Nothing -> Nothing
-    result -> result
-
-parseAndOrEqOrNotOrBool :: [Token] -> Maybe (Bexp, [Token])
-parseAndOrEqOrNotOrBool tokens =
-  case parseEqOrNotOrBool tokens of
-    Just (expr1, TokAnd : restTokens1) -> case parseAndOrEqOrNotOrBool restTokens1 of
-      Just (expr2, restTokens2) -> Just (AndBx expr1 expr2, restTokens2)
-      Nothing -> Nothing
-    result -> result
-
 parseBoolOrParExpr :: [Token] -> Maybe (Bexp, [Token])
 parseBoolOrParExpr (TokOpenBracket : restTokens1) =
-  case parseAndOrEqOrNotOrBool restTokens1 of
+  case parseAndOrBEqOrNotOrBoolOrPar restTokens1 of
     Just (expr, TokCloseBracket : restTokens2) -> Just (expr, restTokens2)
     Just _ -> Nothing
     Nothing -> Nothing
@@ -402,22 +357,16 @@ buildBool tokens =
 
 buildArithmetic :: [Token] -> Aexp
 buildArithmetic tokens =
-  case parseSumOrDiffOrProdOrIntOrPar tokens of
+  case parseSumOrDiffOrProdOrIntOrPar (reverse tokens) of
     Just (expr, []) -> expr
     _ -> error "Run-time error"
 
 isBooleanExp :: [Token] -> Bool
-isBooleanExp [] = False
-isBooleanExp (exp : restTokens)
-  | exp `elem` [TokTrue, TokFalse, TokNot, TokAnd, TokAEq, TokBEq, TokLeq] = True
-  | otherwise = isBooleanExp restTokens
-
-isBooleanExp2 :: [Token] -> Bool
-isBooleanExp2 = any (\x -> x `elem` [TokTrue, TokFalse, TokNot, TokAnd, TokAEq, TokBEq, TokLeq])
+isBooleanExp = any (\x -> x `elem` [TokTrue, TokFalse, TokNot, TokAnd, TokAEq, TokBEq, TokLeq])
 
 buildExpression :: [Token] -> String -> Stm
 buildExpression tokens var
-  | isBooleanExp2 tokens = AssignBx var (buildBool tokens)
+  | isBooleanExp tokens = AssignBx var (buildBool tokens)
   | otherwise = AssignAx var (buildArithmetic tokens)
 
 buildData :: [Token] -> Program
@@ -448,17 +397,25 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
 -- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+-- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
+-- testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
+-- testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
 
--- testParser "x := not True;"          -- Should result in ("", "x=False")
--- testParser "x := True and False;"     -- Should result in ("", "x=False")
--- testParser "x := True and not False;"      -- Should result in ("", "x=True")
--- testParser "x := not (True and False);" -- Should result in ("", "x=True")
--- testParser "x := (True and not False) and (not False);" -- Should result in ("", "x=True")
--- testParser "x := 2 <= 5;"             -- Should result in ("", "x=True")
--- testParser "x := 2 == 5;"             -- Should result in ("", "x=False")
--- testParser "x := 2 + 3 == 5;"         -- Should result in ("", "x=True")
--- testParser "x := not (3 <= 1) and 4 == 2+2;" -- Should result in ("", "x=True")
--- testParser "x := not (3 <= 1);"       -- Should result in ("", "x=True")
--- testParser "x := True = False;"       -- Should result in ("", "x=False")
--- testParser "x := True = False and True = False;" -- Should result in ("", "x=False")
--- testParser "x := True = (1 <= 2);"  -- Should result in ("", "x=True")
+-- Our tests:
+-- testParser "x := not True;" == ("", "x=False")
+-- testParser "x := True and False;" == ("", "x=False")
+-- testParser "x := True and not False;"      == ("", "x=True")
+-- testParser "x := not (True and False);" == ("", "x=True")
+-- testParser "x := (True and not False) and (not False);" == ("", "x=True")
+-- testParser "x := 2 <= 5;" == ("", "x=True")
+-- testParser "x := 2 == 5;" == ("", "x=False")
+-- testParser "x := 2 + 3 == 5;" == ("", "x=True")
+-- testParser "x := not (3 <= 1) and 4 == 2+2;" == ("", "x=True")
+-- testParser "x := not (3 <= 1);" == ("", "x=True")
+-- testParser "x := True = False;" == ("", "x=False")
+-- testParser "x := True = False and True = False;" == ("", "x=False")
+-- testParser "x := True = (1 <= 2);" == ("", "x=True")
+-- testParser "x := 1+2-3+10;" == ("","x=10")
+-- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7; == ("","x=-133")"
+-- testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6)))) * 7; == ("","x=-133")"
+-- testParser "x := (1 + 2 * 3  (4 * 5 + 6)) * 7; == ("","x=-133")"
