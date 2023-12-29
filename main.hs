@@ -41,17 +41,6 @@ instance Ord StackData where
   compare (I _) (B _) = error "Run-time error"
   compare (B _) (I _) = error "Run-time error"
 
-push :: StackData -> Stack -> Stack
-push val stack = val : stack
-
-pop :: Stack -> Stack
-pop [] = error "Run-time error"
-pop (h : t) = t
-
-top :: Stack -> StackData
-top [] = error "Run-time error"
-top (h : t) = h
-
 type StateData = (String, StackData)
 
 type State = [StateData]
@@ -96,10 +85,10 @@ run (inst : code, stack, state)
   | Sub <- inst = run (code, arithmeticOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
-  | Equ <- inst = run (code, comparisonOp (==) stack, state) -- working
-  | Le <- inst = run (code, comparisonOp (<=) stack, state) -- working
-  | And <- inst = run (code, logicalOp (&&) stack, state)-- not working
-  | Neg <- inst = run (code, unaryOp not stack, state) -- working
+  | Equ <- inst = run (code, comparisonOp (==) stack, state)
+  | Le <- inst = run (code, comparisonOp (<=) stack, state)
+  | And <- inst = run (code, logicalOp (&&) stack, state)
+  | Neg <- inst = run (code, unaryOp not stack, state)
   | Fetch var <- inst = run (code, fetch var state : stack, state)
   | Store var <- inst = run (code, tail stack, store var (head stack) state)
   | Noop <- inst = run (code, stack, state)
@@ -129,11 +118,10 @@ run (inst : code, stack, state)
     store var value ((var', value') : state)
       | var == var' = (var', value) : state
       | otherwise = (var', value') : store var value state
-    
+
     fetch :: String -> State -> StackData
     fetch var [] = error "Run-time error"
     fetch var ((var', value) : t) = if var == var' then value else fetch var t
-
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
@@ -304,7 +292,7 @@ parseSumOrDiffOrProdOrIntOrPar tokens =
       case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
         Just (expr2, restTokens2) -> Just (SubAx expr2 expr1, restTokens2)
         Nothing -> Nothing
-    result -> result 
+    result -> result
 
 parseBool :: [Token] -> Maybe (Bexp, [Token])
 parseBool (TokTrue : restTokens) = Just (Bx True, restTokens)
@@ -363,16 +351,53 @@ buildArithmetic tokens =
 isBooleanExp :: [Token] -> Bool
 isBooleanExp = any (\x -> x `elem` [TokTrue, TokFalse, TokNot, TokAnd, TokAEq, TokBEq, TokLeq])
 
-buildExpression :: [Token] -> String -> Stm
-buildExpression tokens var
+buildAssignment :: [Token] -> String -> Stm
+buildAssignment tokens var
   | isBooleanExp tokens = AssignBx var (buildBool tokens)
   | otherwise = AssignAx var (buildArithmetic tokens)
-
+  
 buildData :: [Token] -> Program
 buildData [] = []
 buildData tokens
-  | (TokSemicolon : restTokens1) <- tokens = buildData restTokens1
-  | (TokVar var : TokAssign : restTokens1) <- tokens = buildExpression (takeWhile (/= TokSemicolon) restTokens1) var : buildData (dropWhile (/= TokSemicolon) restTokens1)
+  | (TokVar var : TokAssign : restTokens) <- tokens = 
+    buildAssignment (init (currentStatement 0 restTokens)) var 
+      : buildData (nextStatement 0 restTokens)
+  | (TokOpenBracket : restTokens) <- tokens = 
+    Seq (buildData (init (init (currentStatement 1 restTokens))))
+      : buildData (nextStatement 1 restTokens)
+  | (TokIf : restTokens) <- tokens = 
+    Conditional (getCondition TokThen restTokens) (getCurrentStatement TokThen restTokens) (getCurrentStatement TokElse restTokens)
+      : getNextStatement TokElse restTokens
+  | (TokWhile : restTokens) <- tokens = 
+    While (getCondition TokDo restTokens) (getCurrentStatement TokDo restTokens)
+      : getNextStatement TokDo restTokens
+
+  where
+    nextStatement :: Int -> [Token] -> [Token]
+    nextStatement 0 (TokSemicolon : restTokens) = restTokens
+    nextStatement n (TokOpenBracket : restTokens) = nextStatement (n + 1) restTokens
+    nextStatement n (TokCloseBracket : restTokens) = nextStatement (n - 1) restTokens
+    nextStatement n (_ : restTokens) = nextStatement n restTokens
+    nextStatement _ [] = error "Run-time error"
+
+    currentStatement :: Int -> [Token] -> [Token]
+    currentStatement 0 (TokSemicolon : restTokens) = [TokSemicolon]
+    currentStatement 1 (TokCloseBracket : TokSemicolon : restTokens) = [TokCloseBracket, TokSemicolon]
+    currentStatement n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement (n + 1) restTokens
+    currentStatement n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement (n - 1) restTokens
+    currentStatement n (token : restTokens) = token : currentStatement n restTokens 
+    currentStatement _ [] = error "Run-time error"
+
+    getCondition :: Token -> [Token] -> Bexp
+    getCondition diffToken tokens = buildBool (takeWhile (/= diffToken) tokens)
+
+    getCurrentStatement :: Token -> [Token] -> [Stm]
+    getCurrentStatement diffToken tokens =
+      buildData (currentStatement 0 (tail (dropWhile (/= diffToken) tokens)))
+
+    getNextStatement :: Token -> [Token] -> [Stm]
+    getNextStatement diffToken tokens =
+      buildData (nextStatement 0 (tail (dropWhile (/= diffToken) tokens)))
 
 parse :: String -> Program
 parse = buildData . lexer
@@ -383,6 +408,7 @@ testParser programCode = (stack2Str stack, state2Str state)
   where
     (_, stack, state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
 
+
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
 -- testParser "x := 0 - 2;" == ("","x=-2")
@@ -391,7 +417,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
--- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34")
+-- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34") ********************************
 -- testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
@@ -415,6 +441,6 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := True = False and True = False;" == ("", "x=False")
 -- testParser "x := True = (1 <= 2);" == ("", "x=True")
 -- testParser "x := 1+2-3+10;" == ("","x=10")
--- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7; == ("","x=-133")"
--- testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6)))) * 7; == ("","x=-133")"
--- testParser "x := (1 + 2 * 3  (4 * 5 + 6)) * 7; == ("","x=-133")"
+-- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
+-- testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6))))) * 7;" == ("","x=-133")
+-- testParser "x := (1 + 2 * 3 - (4 * 5 + 6)) * 7;" == ("","x=-133")
