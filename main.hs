@@ -56,10 +56,6 @@ type StateData = (String, StackData)
 
 type State = [StateData]
 
-fetch :: String -> State -> StackData
-fetch var [] = error "Run-time error"
-fetch var ((var', value) : t) = if var == var' then value else fetch var t
-
 createEmptyStack :: Stack
 createEmptyStack = []
 
@@ -100,10 +96,10 @@ run (inst : code, stack, state)
   | Sub <- inst = run (code, arithmeticOp (-) stack, state)
   | Tru <- inst = run (code, B True : stack, state)
   | Fals <- inst = run (code, B False : stack, state)
-  | Equ <- inst = run (code, comparisonOp (==) stack, state)
-  | Le <- inst = run (code, comparisonOp (<=) stack, state)
-  | And <- inst = run (code, logicalOp (&&) stack, state)
-  | Neg <- inst = run (code, unaryOp not stack, state)
+  | Equ <- inst = run (code, comparisonOp (==) stack, state) -- working
+  | Le <- inst = run (code, comparisonOp (<=) stack, state) -- working
+  | And <- inst = run (code, logicalOp (&&) stack, state)-- not working
+  | Neg <- inst = run (code, unaryOp not stack, state) -- working
   | Fetch var <- inst = run (code, fetch var state : stack, state)
   | Store var <- inst = run (code, tail stack, store var (head stack) state)
   | Noop <- inst = run (code, stack, state)
@@ -121,7 +117,7 @@ run (inst : code, stack, state)
       _ -> B (v1 `op` v2) : stack
 
     logicalOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
-    label op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
+    logicalOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
     logicalOp op _ = error "Run-time error"
 
     unaryOp :: (Bool -> Bool) -> Stack -> Stack
@@ -133,6 +129,11 @@ run (inst : code, stack, state)
     store var value ((var', value') : state)
       | var == var' = (var', value) : state
       | otherwise = (var', value') : store var value state
+    
+    fetch :: String -> State -> StackData
+    fetch var [] = error "Run-time error"
+    fetch var ((var', value) : t) = if var == var' then value else fetch var t
+
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
@@ -182,7 +183,7 @@ data Stm
   | AssignAx String Aexp
   | Conditional Bexp Program Program
   | While Bexp Program
-  | Seq Stm Stm
+  | Seq [Stm]
   deriving (Show)
 
 type Program = [Stm]
@@ -212,7 +213,7 @@ compile (stm : program)
   | (AssignAx var aexp) <- stm = compA aexp ++ [Store var] ++ compile program
   | (Conditional bexp stm1 stm2) <- stm = compB bexp ++ [Branch (compile stm1) (compile stm2)] ++ compile program
   | (While bexp stm) <- stm = Loop (compB bexp) (compile stm) : compile program
-  | (Seq stm1 stm2) <- stm = compile [stm1] ++ compile [stm2] ++ compile program
+  | (Seq stms) <- stm = compile stms ++ compile program
 
 data Token
   = TokAssign
@@ -375,7 +376,7 @@ parseNotOrBoolOrPar (TokNot : restTokens1) =
   case parseBoolOrParExpr restTokens1 of
     Just (expr, restTokens2) -> Just (NegBx expr, restTokens2)
     Nothing -> Nothing
-parseNotOrBoolOrPar tokens = parseBool tokens
+parseNotOrBoolOrPar tokens = parseBoolOrParExpr tokens
 
 parseBEqOrNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseBEqOrNotOrBoolOrPar tokens =
@@ -447,3 +448,17 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
 -- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+
+-- testParser "x := not True;"          -- Should result in ("", "x=False")
+-- testParser "x := True and False;"     -- Should result in ("", "x=False")
+-- testParser "x := True and not False;"      -- Should result in ("", "x=True")
+-- testParser "x := not (True and False);" -- Should result in ("", "x=True")
+-- testParser "x := (True and not False) and (not False);" -- Should result in ("", "x=True")
+-- testParser "x := 2 <= 5;"             -- Should result in ("", "x=True")
+-- testParser "x := 2 == 5;"             -- Should result in ("", "x=False")
+-- testParser "x := 2 + 3 == 5;"         -- Should result in ("", "x=True")
+-- testParser "x := not (3 <= 1) and 4 == 2+2;" -- Should result in ("", "x=True")
+-- testParser "x := not (3 <= 1);"       -- Should result in ("", "x=True")
+-- testParser "x := True = False;"       -- Should result in ("", "x=False")
+-- testParser "x := True = False and True = False;" -- Should result in ("", "x=False")
+-- testParser "x := True = (1 <= 2);"  -- Should result in ("", "x=True")
