@@ -447,7 +447,7 @@ These functions allow us to parse the provided list of **Tokens** respectively i
 
 The sequence is ordered from the lowest to the highest level of precedence and each function creates a call chain all the way to the function responsible for the highest precedence level, before trying to effectively match the resulting expression of the recursive call, with the current parsing function pattern. The parsing sequence starts by calling the function responsible for parsing the lowest level of precedence.
 
-Because the operand parsing functions execute the pattern matching, by checking the head of the list and then parsing with the same function (same level of precedence) the rest of the tokens, the parsing process resolved the expressions with right associativity. To solve this, we decided to reverse the list of tokens before parsing, so that the expression was parsed with left associativity.
+Because the operand parsing functions execute the pattern matching by checking the head of the list and then parsing with the same function (same level of precedence) the rest of the tokens, the parsing process resolved the expressions with right associativity. To solve this, we decided to reverse the list of tokens before parsing, so that the expression was parsed with left associativity.
 
 By using this approach, we can simply define the **parse** function as follows:
 
