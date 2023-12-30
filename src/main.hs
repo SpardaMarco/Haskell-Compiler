@@ -1,4 +1,4 @@
--- PFL 2023/24 - Haskell practical assignment quickstart
+-- PFL 2023/24 - Haskell Practical Assignment Quickstart
 
 import Data.Char
 import Data.List
@@ -8,7 +8,8 @@ import Distribution.Simple.Setup (programDbOptions)
 -- Part 1
 
 -- Do not modify our definition of Inst and Code
--- Inst is the type of instructions.
+
+-- Inst represents all available instructions to be run by the machine
 data Inst
   = Push Integer
   | Add
@@ -27,36 +28,36 @@ data Inst
   | Loop Code Code
   deriving (Show)
 
--- The code of the machine is a list of instructions
+-- Code is a list of Inst. It represents a set of instructions to be executed
 type Code = [Inst]
 
--- StackData is a type that can hold either an Integer or a Bool
+-- StackData represents the different data types that can be held in the Stack type
 data StackData
   = I Integer
   | B Bool
   deriving (Show, Eq)
 
--- Stack is a list of StackData
+-- Stack represents a custom stack-like data structure
 type Stack = [StackData]
 
--- We define the order of StackData so that we can use "<=" operator with StackData
+-- Ord StackData establishes how the StackData type is ordered
 instance Ord StackData where
+  compare :: StackData -> StackData -> Ordering
   compare (I n1) (I n2) = compare n1 n2
   compare (B b1) (B b2) = compare b1 b2
-  compare (I _) (B _) = error "Run-time error"
-  compare (B _) (I _) = error "Run-time error"
+  compare _ _ = error "Run-time error"
 
--- StateData is a pair of a String and a StackData, where the String is the name of a variable and the StackData is its value
+-- StateData is a tuple that contains a String and a StackData, where the String represents a variable's name, and the StackData corresponds to its value
 type StateData = (String, StackData)
 
--- State is a list of StateData
+-- State is a list of StateData. It represents the storage
 type State = [StateData]
 
--- Creates an empty stack
+-- Creates an empty Stack
 createEmptyStack :: Stack
 createEmptyStack = []
 
--- Transforms a stack into a string.
+-- Converts a stack into a string
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str [h] = case h of
@@ -66,11 +67,11 @@ stack2Str (h : t) = case h of
   I i -> show i ++ "," ++ stack2Str t
   B b -> show b ++ "," ++ stack2Str t
 
--- Creates an empty state
+-- Creates an empty State
 createEmptyState :: State
 createEmptyState = []
 
--- Auxiliary function to transform a state into a string.
+-- Converts a State into a String
 state2StrAux :: State -> String
 state2StrAux [] = ""
 state2StrAux [(var, value)] = case value of
@@ -80,11 +81,11 @@ state2StrAux ((var, value) : state) = case value of
   I i -> var ++ "=" ++ show i ++ "," ++ state2StrAux state
   B b -> var ++ "=" ++ show b ++ "," ++ state2StrAux state
 
--- Transforms a state into a string.
+-- Sorts a State and converts it into a String
 state2Str :: State -> String
-state2Str state = state2StrAux (sort state)
+state2Str = state2StrAux . sort
 
--- Executes a program (a list of instructions) on a stack and a state, returning a new stack and a new state, and possibly raising an exception "Run-time error". 
+-- Executes a program (a list of instructions) for a given stack and state, returning the resulting stack and state
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (inst : code, stack, state) =
@@ -106,6 +107,7 @@ run (inst : code, stack, state) =
     Loop code1 code2 -> run (code1 ++ [Branch (code2 ++ [Loop code1 code2]) [Noop]] ++ code, stack, state)
   where
     -- Auxiliary functions
+
     -- Executes an arithmetic operation on the top two elements of the stack
     arithmeticOp :: (Integer -> Integer -> Integer) -> Stack -> Stack
     arithmeticOp op (I n1 : I n2 : stack) = I (n1 `op` n2) : stack
@@ -118,33 +120,35 @@ run (inst : code, stack, state) =
       (B _, I _) -> error "Run-time error"
       _ -> B (v1 `op` v2) : stack
 
-    -- Executes a logical operation on the top two elements of the stack
+    -- Executes a binary logical operation on the top two elements of the stack
     logicalOp :: (Bool -> Bool -> Bool) -> Stack -> Stack
     logicalOp op (B b1 : B b2 : stack) = B (b1 `op` b2) : stack
     logicalOp op _ = error "Run-time error"
 
-    -- Executes a unary operation on the top element of the stack
+    -- Executes an unary logical operation on the top element of the stack
     unaryOp :: (Bool -> Bool) -> Stack -> Stack
     unaryOp op (B b : stack) = B (op b) : stack
     unaryOp op _ = error "Run-time error"
 
-    -- Stores a variable value pair in the state (if the variable already exists, its value is updated).
+    -- Stores a variable and its corresponding value in the storage. If the variable is already stored, its value is updated
     store :: String -> StackData -> State -> State
     store var value [] = [(var, value)]
     store var value ((var', value') : state)
       | var == var' = (var', value) : state
       | otherwise = (var', value') : store var value state
 
-    -- Fetches a value from the state. If the variable does not exist, raises an exception "Run-time error".
+    -- Fetches a given variable's value from the storage. If the variable does not exist in the storage, raises an exception "Run-time error"
     fetch :: String -> State -> StackData
     fetch var [] = error "Run-time error"
     fetch var ((var', value) : t) = if var == var' then value else fetch var t
 
 -- To help you test your assembler
+
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where
     (_, stack, state) = run (code, createEmptyStack, createEmptyState)
+
 
 -- Examples:
 -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
@@ -163,8 +167,10 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
 -- You should get an exception with the string: "Run-time error"
 
+
 -- Part 2
--- Aexp is the type of arithmetic expressions.
+
+-- Aexp represents all possible arithmetic expressions
 data Aexp
   = AddAx Aexp Aexp
   | MultAx Aexp Aexp
@@ -173,7 +179,7 @@ data Aexp
   | VarAx String
   deriving (Eq, Show)
 
--- Bexp is the type of boolean expressions.
+-- Bexp represents all possible boolean expressions
 data Bexp
   = AndBx Bexp Bexp
   | EqBx Bexp Bexp
@@ -184,7 +190,7 @@ data Bexp
   | VarBx String
   deriving (Eq, Show)
 
--- Stm is the type of statements, this encompasses both arithmetic and boolean assignments, conditionals, while loops and sequences of statements.
+-- Stm represents all available statements
 data Stm
   = AssignBx String Bexp
   | AssignAx String Aexp
@@ -193,10 +199,10 @@ data Stm
   | Seq [Stm]
   deriving (Show)
 
--- Program is a list of statements.
+-- Program is a list of Stm. It represents a set of statements
 type Program = [Stm]
 
--- Compiles an arithmetic expression into a list of instructions.
+-- Compiles an arithmetic expression into a list of instructions
 compA :: Aexp -> Code
 compA aexp =
   case aexp of
@@ -206,7 +212,7 @@ compA aexp =
     NumAx n -> [Push n]
     VarAx v -> [Fetch v]
 
--- Compiles a boolean expression into a list of instructions.
+-- Compiles a boolean expression into a list of instructions
 compB :: Bexp -> Code
 compB bexp =
   case bexp of
@@ -218,7 +224,7 @@ compB bexp =
     Bx b -> if b then [Tru] else [Fals]
     VarBx v -> [Fetch v]
 
--- Compiles a program into a list of instructions.
+-- Compiles a program into a list of instructions
 compile :: Program -> Code
 compile [] = []
 compile (stm : program) =
@@ -230,7 +236,7 @@ compile (stm : program) =
     While bexp stm -> Loop (compB bexp) (compile stm) : compile program
     Seq stms -> compile stms ++ compile program
 
--- Token is the type of tokens used by the lexer to parse the program.
+-- Token represents the type of tokens used by the lexer to parse the program
 data Token
   = TokAssign
   | TokSemicolon
@@ -256,7 +262,7 @@ data Token
   | TokVar String
   deriving (Show, Eq)
 
--- Function that receives a string and returns a list of tokens. This function is used by the parser to parse the program.
+-- Converts a given string into a list of tokens
 lexer :: String -> [Token]
 lexer [] = []
 lexer (':' : '=' : rest) = TokAssign : lexer rest
@@ -286,18 +292,18 @@ lexer (c : rest)
   | otherwise = error "Run-time error"
 
 -- Parser functions
--- The parser functions receive a list of tokens and return a pair of an expression and the remaining tokens.
--- If the parser fails, it returns Nothing.
 
--- Parses an integer or variable token.
--- Returns a tuple containing the parsed arithmetic expression and the remaining tokens.
+-- The parser functions convert a given list of tokens into a tuple containing a parsed expression and the remaining tokens. If the parser functions fail, it returns Nothing
+
+-- Parses integers or variables
+-- Returns a tuple containing the parsed arithmetic expression and the remaining tokens
 parseInt :: [Token] -> Maybe (Aexp, [Token])
 parseInt (TokNum n : restTokens) = Just (NumAx n, restTokens)
 parseInt (TokVar v : restTokens) = Just (VarAx v, restTokens)
 parseInt _ = Nothing
 
--- Parses an integer or a parenthesized expression.
---Returns a tuple containing the parsed arithmetic expression and the remaining tokens.
+-- Parses integers or parenthesized expressions
+-- Returns a tuple containing the parsed arithmetic expression and the remaining tokens
 parseIntOrParenExpr :: [Token] -> Maybe (Aexp, [Token])
 parseIntOrParenExpr (TokCloseBracket : restTokens1) =
   case parseSumOrDiffOrProdOrIntOrPar restTokens1 of
@@ -306,8 +312,8 @@ parseIntOrParenExpr (TokCloseBracket : restTokens1) =
     Nothing -> Nothing
 parseIntOrParenExpr tokens = parseInt tokens
 
--- Parses multiplication, division, or an integer or a parenthesized expression.
--- Returns a tuple containing the parsed arithmetic expression and the remaining tokens.
+-- Parses multiplications, integers, or parenthesized expressions
+-- Returns a tuple containing the parsed arithmetic expression and the remaining tokens
 parseProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
 parseProdOrIntOrPar tokens =
   case parseIntOrParenExpr tokens of
@@ -317,8 +323,8 @@ parseProdOrIntOrPar tokens =
         Nothing -> Nothing
     result -> result
 
--- Parses addition, subtraction, multiplication, division, integer, or parenthesized expression.
--- Returns a tuple containing the parsed arithmetic expression and the remaining tokens.
+-- Parses additions, subtractions, multiplications, integers, or parenthesized expressions
+-- Returns a tuple containing the parsed arithmetic expression and the remaining tokens
 parseSumOrDiffOrProdOrIntOrPar :: [Token] -> Maybe (Aexp, [Token])
 parseSumOrDiffOrProdOrIntOrPar tokens =
   case parseProdOrIntOrPar tokens of
@@ -334,8 +340,8 @@ parseSumOrDiffOrProdOrIntOrPar tokens =
 
 -- Boolean parser functions
 
--- Parses boolean literals, variable tokens or boolean expressions related to arithmetic expressions.
--- Returns a tuple containing the parsed boolean expression and the remaining tokens.
+-- Parses boolean literals, variables, or boolean expressions related to arithmetic expressions
+-- Returns a tuple containing the parsed boolean expression and the remaining tokens
 parseBool :: [Token] -> Maybe (Bexp, [Token])
 parseBool (TokTrue : restTokens) = Just (Bx True, restTokens)
 parseBool (TokFalse : restTokens) = Just (Bx False, restTokens)
@@ -350,8 +356,8 @@ parseBool tokens =
         Just (expr2, restTokens2) -> Just (EqAx expr2 expr1, restTokens2)
     Nothing -> Nothing
 
--- Parses boolean literals, variable tokens, boolean expressions related to arithmetic expressions, or a parenthesized boolean expression.
--- Returns a tuple containing the parsed boolean expression and the remaining tokens.
+-- Parses boolean literals, boolean expressions related to arithmetic expressions, or parenthesized boolean expressions
+-- Returns a tuple containing the parsed boolean expression and the remaining tokens
 parseBoolOrParExpr :: [Token] -> Maybe (Bexp, [Token])
 parseBoolOrParExpr (TokCloseBracket : restTokens1) =
   case parseAndOrBEqOrNotOrBoolOrPar restTokens1 of
@@ -360,16 +366,16 @@ parseBoolOrParExpr (TokCloseBracket : restTokens1) =
     Nothing -> Nothing
 parseBoolOrParExpr tokens = parseBool tokens
 
--- Parses negation or boolean literals, variable tokens, boolean expressions related to arithmetic expressions, or a parenthesized boolean expression.
--- Returns a tuple containing the parsed boolean expression and the remaining tokens.
+-- Parses boolean negations, boolean literals, boolean expressions related to arithmetic expressions, or parenthesized boolean expressions
+-- Returns a tuple containing the parsed boolean expression and the remaining tokens
 parseNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseNotOrBoolOrPar tokens =
   case parseBoolOrParExpr tokens of
     Just (expr1, TokNot : restTokens1) -> Just (NegBx expr1, restTokens1)
     result -> result
 
--- Parses boolean equality, negation, boolean literals, variable tokens, boolean expressions related to arithmetic expressions, or a parenthesized boolean expression.
--- Returns a tuple containing the parsed boolean expression and the remaining tokens.
+-- Parses boolean equalities, boolean negations, boolean literals, boolean expressions related to arithmetic expressions, or parenthesized boolean expressions
+-- Returns a tuple containing the parsed boolean expression and the remaining tokens
 parseBEqOrNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseBEqOrNotOrBoolOrPar tokens =
   case parseNotOrBoolOrPar tokens of
@@ -379,8 +385,8 @@ parseBEqOrNotOrBoolOrPar tokens =
         Nothing -> Nothing
     result -> result
 
--- Parses AND, boolean equality, negation, boolean literals, variable tokens, boolean expressions related to arithmetic expressions, or a parenthesized boolean expression.
--- Returns a tuple containing the parsed boolean expression and the remaining tokens.
+-- Parses boolean conjunctions, boolean equalities, boolean negations, boolean literals, boolean expressions related to arithmetic expressions, or parenthesized boolean expressions
+-- Returns a tuple containing the parsed boolean expression and the remaining tokens
 parseAndOrBEqOrNotOrBoolOrPar :: [Token] -> Maybe (Bexp, [Token])
 parseAndOrBEqOrNotOrBoolOrPar tokens =
   case parseBEqOrNotOrBoolOrPar tokens of
@@ -392,32 +398,32 @@ parseAndOrBEqOrNotOrBoolOrPar tokens =
 
 -- Top-level parser functions
 
--- Builds a boolean expression from a list of tokens.
+-- Builds a boolean expression from a given list of tokens
 buildBool :: [Token] -> Bexp
 buildBool tokens =
   case parseAndOrBEqOrNotOrBoolOrPar (reverse tokens) of
     Just (expr, []) -> expr
     _ -> error "Run-time error"
 
--- Builds an arithmetic expression from a list of tokens.
+-- Builds an arithmetic expression from a given list of tokens
 buildArithmetic :: [Token] -> Aexp
 buildArithmetic tokens =
   case parseSumOrDiffOrProdOrIntOrPar (reverse tokens) of
     Just (expr, []) -> expr
     _ -> error "Run-time error"
 
--- Auxiliary function to check if a list of tokens contains a boolean expression. This is used to decide whether to build a boolean assignment or an arithmetic assignment.
+-- Checks if a given list of tokens represents a boolean expression
 isBooleanExp :: [Token] -> Bool
 isBooleanExp = any (\x -> x `elem` [TokTrue, TokFalse, TokNot, TokAnd, TokAEq, TokBEq, TokLeq])
 
--- Builds an assignment from a list of tokens.
+-- Builds an assignment statement from a given list of tokens
 buildAssignment :: [Token] -> String -> Stm
 buildAssignment tokens var
   | isBooleanExp tokens = AssignBx var (buildBool tokens)
   | otherwise = AssignAx var (buildArithmetic tokens)
 
--- Builds a program from a list of tokens. This is responsible for calling the other functions to build the program. 
-buildData :: [Token] -> Program
+-- Builds a program from a given list of tokens
+buildData :: [Token] -> [Stm]
 buildData [] = []
 buildData tokens =
   case tokens of
@@ -434,10 +440,11 @@ buildData tokens =
       While (getCondition TokDo restTokens) (getCurrentStatement TokDo restTokens)
         : getnextStatements TokDo restTokens
     _ -> error "Run-time error"
-
+  
   where
     -- Auxiliary functions
-    -- Returns the list of tokens corresponding the statements after the current statement.
+
+    -- Returns a list of tokens corresponding to the statements after the current statement
     nextStatements :: Int -> [Token] -> [Token]
     nextStatements 0 (TokSemicolon : restTokens) = restTokens
     nextStatements n (TokOpenBracket : restTokens) = nextStatements (n + 1) restTokens
@@ -445,15 +452,16 @@ buildData tokens =
     nextStatements n (_ : restTokens) = nextStatements n restTokens
     nextStatements _ [] = error "Run-time error"
 
-    -- Returns the list of tokens corresponding to the current statement.
+    -- Returns a list of tokens corresponding to the current statement
     currentStatement :: Int -> [Token] -> [Token]
     currentStatement 0 (TokSemicolon : restTokens) = [TokSemicolon]
     currentStatement n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement (n + 1) restTokens
     currentStatement n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement (n - 1) restTokens
-    currentStatement n (token : restTokens) = token : currentStatement n restTokens 
+    currentStatement n (token : restTokens) = token : currentStatement n restTokens
     currentStatement _ [] = error "Run-time error"
 
-    -- Wrapper functions to get the condition, current statement and next statements for conditional and while statements.
+    -- Wrapper functions to get the condition, the current statement and the following statements for conditional and while statements
+   
     getCondition :: Token -> [Token] -> Bexp
     getCondition diffToken tokens = buildBool (takeWhile (/= diffToken) tokens)
 
@@ -465,16 +473,16 @@ buildData tokens =
     getnextStatements diffToken tokens =
       buildData (nextStatements 0 (tail (dropWhile (/= diffToken) tokens)))
 
--- Parses a string (representing a program) into a program for the compiler.
+-- Parses a given string into a program (list of statements) for the compiler to execute
 parse :: String -> Program
 parse = buildData . lexer
+
 
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
   where
     (_, stack, state) = run (compile (parse programCode), createEmptyStack, createEmptyState)
-
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
@@ -493,6 +501,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
 -- testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
 
+-- Custom Tests:
 -- testParser "x := not True;" == ("", "x=False")
 -- testParser "x := True and False;" == ("", "x=False")
 -- testParser "x := True and not False;"      == ("", "x=True")
