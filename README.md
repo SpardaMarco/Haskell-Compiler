@@ -457,9 +457,9 @@ parse :: String -> Program
 parse = buildData . lexer
 ```
 
-This function receives a string and converts it into a list of **Tokens** by calling the **lexer** function. It then converts the list of **Tokens** into a list of **Stms** by calling the **buildData** function, and the precedence of the operations is properly handled by the **buildArithmetic** and **buildBool** functions.
+This function receives a string and converts it into a list of **Tokens** by calling the **lexer** function. It then converts the list of **Tokens** into a list of **Stms** by calling the **buildData** function, which uses the **buildArithmetic** and **buildBool** functions to handle the parsing of expressions, according to the precedence of operations.
 
-In order to evaluate the arithmetic expressions, we implemented the following function:
+In order to compile the arithmetic expressions, we implemented the following function:
 
 ```haskell
 -- Compiles an arithmetic expression into a list of instructions
