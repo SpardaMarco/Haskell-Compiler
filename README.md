@@ -70,7 +70,7 @@ This definition allows us to identify the tuples by the name of the variable, wh
 
 ### Functions
 
-In order to create a empty **stack** and **state**, we implemented the following functions:
+In order to create an empty **stack** and **state**, we implemented the following functions:
 
 ```haskell
 -- Creates an empty Stack
@@ -180,7 +180,7 @@ run (inst : code, stack, state) =
 
 This function receives a tuple of 3 elements, where the first element is the **code** (a list of instructions), the second element is the **stack** and the third element is the **state**. It then processes the **code** and returns a tuple of 3 elements, where the first element is the remaining **code** (should be empty), the second element is the resulting **stack** and the third element is the resulting **state**.
 
-Each instruction is processed one at a time, and the resulting **code**, **stack** and **state** are passed to the next instruction. This is done recursively until the **code** is empty. Each case of the **run** function corresponds to a different instruction, indentified by pattern matching. The **run** function also uses auxiliary functions to process the different types of instructions.
+Each instruction is processed one at a time, and the resulting **code**, **stack** and **state** are passed to the next instruction. This is done recursively until the **code** is empty. Each case of the **run** function corresponds to a different instruction, identified by pattern matching. The **run** function also uses auxiliary functions to process the different types of instructions.
 
 The *op* auxiliary functions are used to process the arithmetic, comparison and logical operations. These functions receive a function that corresponds to the operation to be performed, and the **stack**. The *op* functions then apply the operation to the top elements of the **stack** and return the resulting **stack**. If the **stack** does not have enough elements to perform the operation, a *run-time error* is thrown.
 
@@ -297,7 +297,7 @@ data Stm
 type Program = [Stm]
 ```
 
-The **Stm** data type allows to represent all the possible statements that can be used in the language: 
+The **Stm** data type allows us to represent all the possible statements that can be used in the language: 
   - Assignment of a boolean expression (*Bexp*), to a variable (*String*)
   - Assignment of an arithmetic expression (*Aexp*) to a variable (*String*)
   - Conditional, which takes a boolean expression (*Bexp*) and two lists of statements (*[Stm]*) as arguments
@@ -308,7 +308,7 @@ This type is used by the **parser** to parse the string into the corresponding *
 
 ### Functions
 
-In order facilitate the parsing of the program, we started by implementing a **lexer** auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the **buildData** function to build the corresponding list of **Stms** for the **parse** function to process.
+In order to facilitate the parsing of the program, we started by implementing a **lexer** auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the **buildData** function to build the corresponding list of **Stms**.
 
 The **lexer** function is defined as follows:
 
@@ -447,7 +447,7 @@ These functions allow us to parse the provided list of **Tokens** respectively i
 
 The sequence is ordered from the lowest to the highest level of precedence and each function creates a call chain all the way to the function responsible for the highest precedence level, before trying to effectively match the resulting expression of the recursive call, with the current parsing function pattern. The parsing sequence starts by calling the function responsible for parsing the lowest level of precedence.
 
-Because the operand parsing functions are executing the pattern matching, by checking the head of the list and then parsing with the same function (same level of precedence) the rest of the tokens, the parsing process was resolving the expressions with right associativity. To solve this, we decided to reverse the list of tokens before parsing, so that the expression was parsed with left associativity.
+Because the operand parsing functions execute the pattern matching, by checking the head of the list and then parsing with the same function (same level of precedence) the rest of the tokens, the parsing process resolved the expressions with right associativity. To solve this, we decided to reverse the list of tokens before parsing, so that the expression was parsed with left associativity.
 
 By using this approach, we can simply define the **parse** function as follows:
 
