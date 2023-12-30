@@ -304,7 +304,7 @@ The **Stm** data type allows us to represent all the possible statements that ca
   - Loop, which takes a boolean expression (*Bexp*) and a list of statements (*[Stm]*) as arguments
   - Sequence of statements, which takes a list of statements (*[Stm]*) as argument
 
-This type is used by the **parser** to parse the string into the corresponding **Program**. The **compiler** function then uses the **Program** to convert it into **Code**, a list of **Instructions**.
+This type is used by the **parser** to parse the string into the corresponding **Program**, a list of **Stms**. The **compiler** function then uses the **Program** to convert it into **Code**, a list of **Instructions**.
 
 ### Functions
 
