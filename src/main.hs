@@ -194,8 +194,8 @@ data Bexp
 data Stm
   = AssignBx String Bexp
   | AssignAx String Aexp
-  | Conditional Bexp Program Program
-  | While Bexp Program
+  | Conditional Bexp [Stm] [Stm]
+  | While Bexp [Stm]
   | Seq [Stm]
   deriving (Show)
 
@@ -435,11 +435,12 @@ buildData tokens =
         : buildData (nextStatements 1 restTokens)
     (TokIf : restTokens) ->
       Conditional (getCondition TokThen restTokens) (getCurrentStatement TokThen restTokens) (getCurrentStatement TokElse restTokens)
-        : getnextStatements TokElse restTokens
+        : getNextStatements TokElse restTokens
     (TokWhile : restTokens) ->
+      
       While (getCondition TokDo restTokens) (getCurrentStatement TokDo restTokens)
-        : getnextStatements TokDo restTokens
-    _ -> error "Run-time error"
+        : getNextStatements TokDo restTokens
+    _ -> error "Run-time error" 
   
   where
     -- Auxiliary functions
@@ -469,8 +470,8 @@ buildData tokens =
     getCurrentStatement diffToken tokens =
       buildData (currentStatement 0 (tail (dropWhile (/= diffToken) tokens)))
 
-    getnextStatements :: Token -> [Token] -> [Stm]
-    getnextStatements diffToken tokens =
+    getNextStatements :: Token -> [Token] -> [Stm]
+    getNextStatements diffToken tokens =
       buildData (nextStatements 0 (tail (dropWhile (/= diffToken) tokens)))
 
 -- Parses a given string into a program (list of statements) for the compiler to execute
@@ -492,7 +493,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
--- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34") ********************************
+-- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;); else x := 1;" == ("","x=34")
 -- testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
