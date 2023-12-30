@@ -308,7 +308,7 @@ This type is used by the **parser** to parse the string into the corresponding *
 
 ### Functions
 
-In order to facilitate the parsing of the program, we started by implementing a **lexer** auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the **buildData** function to build the corresponding list of **Stms**.
+In order to streamline the parsing of the program, we started by implementing a **lexer** auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the **buildData** function to build the corresponding list of **Stms**.
 
 The **lexer** function is defined as follows:
 
