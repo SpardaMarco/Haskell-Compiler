@@ -20,11 +20,11 @@ In the first part of the assignment, we were asked to implement an assembler for
 
 ### Data Types
 
-The low-level machine we are implementing consists of a tuple of three elements, where the first one is the *code*, the second is the *stack* and the third is the *state*.
+The low-level machine we are implementing consists of a tuple of three elements, where the first one is the **code**, the second is the **stack** and the third is the **state**.
 
-The *code* type was already defined by the pratical assignment template.
+The **code** type was already defined by the pratical assignment template.
 
-For the *stack*, we decided to create a new type called *StackData* which can hold either an Integer or a Boolean value. The *stack* would then be defined as a list of *StackData*.
+For the **stack**, we decided to create a new type called **StackData** which can hold either an Integer or a Boolean value. The **stack** would then be defined as a list of **StackData**.
 
 These types are defined as follows:
 
@@ -54,7 +54,7 @@ instance Ord StackData where
 
 This approach allows us to compare the values of the **stack** elements. If the values are of different types, a *Run-time error* is thrown.
 
-As for the **state**, we decided to create a new type called **StateData**, which consists of a tuple containing a **String** and **StackData**. The **state** would then be defined as a list of **StateData** that represents the storage, through which we can store or retrieve variable values. 
+As for the **state**, we decided to create a new type called **StateData**, which consists of a tuple containing a **String** and **StackData**. The **state** would then be defined as a list of **StateData** that represents the storage, through which we can store or retrieve variable values.
 
 These types are defined as follows:
 
@@ -66,7 +66,7 @@ type StateData = (String, StackData)
 type State = [StateData]
 ```
 
-This definition allows us to identify the tuples by the name of the variable, which is useful when we need to retrieve or update the value of a variable. This is also useful for the implementation of the ***state2Str*** function, which will need to print the *state* ordered by the name of the variables.
+This definition allows us to identify the tuples by the name of the variable, which is useful when we need to retrieve or update the value of a variable. This is also useful for the implementation of the *state2Str* function, which will need to print the **state** ordered by the name of the variables.
 
 ### Functions
 
@@ -114,7 +114,7 @@ state2Str :: State -> String
 state2Str = state2StrAux . sort
 ```
 
-In this function, we use the **sort** function to sort the **state** by the name of the variables, so that the **state** is displayed in alphabetical order.
+In this function, we use the *sort* function to sort the **state** by the name of the variables, so that the **state** is displayed in alphabetical order.
 
 Finally, in order to process the **code**, we implemented the following function:
 
@@ -180,13 +180,13 @@ run (inst : code, stack, state) =
 
 This function receives a tuple of 3 elements, where the first element is the **code** (a list of instructions), the second element is the **stack** and the third element is the **state**. It then processes the **code** and returns a tuple of 3 elements, where the first element is the remaining **code** (should be empty), the second element is the resulting **stack** and the third element is the resulting **state**.
 
-Each instruction is processed one at a time, and the resulting **code**, **stack** and **state** are passed to the next instruction. This is done recursively until the **code** is empty. Each case of the **run** function corresponds to a different instruction, identified by pattern matching. The **run** function also uses auxiliary functions to process the different types of instructions.
+Each instruction is processed one at a time, and the resulting **code**, **stack** and **state** are passed to the next instruction. This is done recursively until the **code** is empty. Each case of the *run* function corresponds to a different instruction, identified by pattern matching. The *run* function also uses auxiliary functions to process the different types of instructions.
 
-The *op* auxiliary functions are used to process the arithmetic, comparison and logical operations. These functions receive a function that corresponds to the operation to be performed, and the **stack**. The *op* functions then apply the operation to the top elements of the **stack** and return the resulting **stack**. If the **stack** does not have enough elements to perform the operation, a *run-time error* is thrown.
+The *op* auxiliary functions are used to process the arithmetic, comparison and logical operations. These functions receive a function that corresponds to the operation to be performed, and the **stack**. The *op* functions then apply the operation to the top elements of the **stack** and return the resulting **stack**. If the **stack** does not have enough elements to perform the operation, a *Run-time error* is thrown.
 
 The *store* auxiliary function is used to store a variable and its corresponding value (top of the stack) in the **state**. If the variable is already stored, its value is updated. This function receives the variable name, the value to be stored and the **state**. The *store* function then searches for the variable in the **state** and updates its value if it exists, or adds the variable and its value to the **state** if it does not exist.
 
-The *fetch* auxiliary function is used to fetch a variable's value from the **state**. If the variable does not exist in the **state**, a *run-time error* is thrown. This function receives the variable name and the **state**. The *fetch* function then searches for the variable in the **state** and returns its value if it exists, or throws a *run-time error* if it does not exist.
+The *fetch* auxiliary function is used to fetch a variable's value from the **state**. If the variable does not exist in the **state**, a *Run-time error* is thrown. This function receives the variable name and the **state**. The *fetch* function then searches for the variable in the **state** and returns its value if it exists, or throws a *Run-time error* if it does not exist.
 
 ### Test Examples
 
@@ -253,7 +253,7 @@ data Token
   deriving (Show, Eq)
 ```
 
-The **Token** data type is used by the **lexer** to parse the program and convert it into a list of **Tokens**.
+The **Token** data type is used by the *lexer* to parse the program and convert it into a list of **Tokens**.
 
 In order to represent any arithmetic or boolean expression, we created the following data types:
 
@@ -279,7 +279,7 @@ data Bexp
   deriving (Eq, Show)
 ```
 
-These types are evaluated by the functions **compA** and **compB**, which are used by the **compiler** to process the list of **Stms** and convert it into a list of **Instructions**.
+These types are evaluated by the functions *compA* and *compB*, which are used by the *compile* to process the list of **Stms** and convert it into a list of **Instructions**.
 
 To facilitate the compilation of the program, we created the following data type:
 
@@ -288,8 +288,8 @@ To facilitate the compilation of the program, we created the following data type
 data Stm
   = AssignBx String Bexp
   | AssignAx String Aexp
-  | Conditional Bexp [Stm] [Stm]
-  | While Bexp [Stm]
+  | Conditional Bexp Stm Stm
+  | While Bexp Stm
   | Seq [Stm]
   deriving (Show)
 
@@ -297,20 +297,20 @@ data Stm
 type Program = [Stm]
 ```
 
-The **Stm** data type allows us to represent all the possible statements that can be used in the language: 
-  - Assignment of a boolean expression (*Bexp*), to a variable (*String*)
-  - Assignment of an arithmetic expression (*Aexp*) to a variable (*String*)
-  - Conditional, which takes a boolean expression (*Bexp*) and two lists of statements (*[Stm]*) as arguments
-  - Loop, which takes a boolean expression (*Bexp*) and a list of statements (*[Stm]*) as arguments
-  - Sequence of statements, which takes a list of statements (*[Stm]*) as argument
+The **Stm** data type allows us to represent all the possible statements that can be used in the language:
+  - Assignment of a boolean expression (**Bexp**), to a variable (**String**)
+  - Assignment of an arithmetic expression (**Aexp**) to a variable (**String**)
+  - Conditional, which takes a boolean expression (**Bexp**) and two statements (**Stm**) as arguments
+  - Loop, which takes a boolean expression (**Bexp**) and a statement (**Stm**) as argument
+  - Sequence of statements, which takes a list of statements (**[Stm]**) as argument
 
-This type is used by the **parser** to parse the string into the corresponding **Program**, a list of **Stms**. The **compiler** function then uses the **Program** to convert it into **Code**, a list of **Instructions**.
+This type is used by the *parse* function to parse the string into the corresponding **Program**, a list of **Stms**. The *compile* function then uses the **Program** to convert it into **Code**, a list of **Instructions**.
 
 ### Functions
 
-In order to streamline the parsing of the program, we started by implementing a **lexer** auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the **buildData** function to build the corresponding list of **Stms**.
+In order to streamline the parsing of the program, we started by implementing a *lexer* auxiliary function that splits the given string into a list of **Tokens**. This function will then be used along with the *buildData* function to build the corresponding list of **Stms**.
 
-The **lexer** function is defined as follows:
+The *lexer* function is defined as follows:
 
 ```haskell
 -- Converts a given string into a list of tokens
@@ -343,26 +343,26 @@ lexer (c : rest)
   | otherwise = error "Run-time error"
 ```
 
-The **buildData** function is defined as follows:
+The *buildData* function is defined as follows:
 
 ```haskell
+-- Builds a program from a given list of tokens
 -- Builds a program from a given list of tokens
 buildData :: [Token] -> [Stm]
 buildData [] = []
 buildData tokens =
   case tokens of
     (TokVar var : TokAssign : restTokens) ->
-      buildAssignment (init (currentStatement 0 restTokens)) var
+      buildAssignment (init (currentStatement TokAssign 0 restTokens)) var
         : buildData (nextStatements 0 restTokens)
     (TokOpenBracket : restTokens) ->
-      Seq (buildData (init (init (currentStatement 1 restTokens))))
+      Seq (buildData (init (init (currentStatement TokOpenBracket 1 restTokens))))
         : buildData (nextStatements 1 restTokens)
     (TokIf : restTokens) ->
-      Conditional (getCondition TokThen restTokens) (getCurrentStatement TokThen restTokens) (getCurrentStatement TokElse restTokens)
+      Conditional (getCondition TokThen restTokens) (head (getCurrentStatement TokThen restTokens)) (head (getCurrentStatement TokElse restTokens))
         : getNextStatements TokElse restTokens
     (TokWhile : restTokens) ->
-      
-      While (getCondition TokDo restTokens) (getCurrentStatement TokDo restTokens)
+      While (getCondition TokDo restTokens) (head (getCurrentStatement TokDo restTokens))
         : getNextStatements TokDo restTokens
     _ -> error "Run-time error" 
   
@@ -378,12 +378,15 @@ buildData tokens =
     nextStatements _ [] = error "Run-time error"
 
     -- Returns a list of tokens corresponding to the current statement
-    currentStatement :: Int -> [Token] -> [Token]
-    currentStatement 0 (TokSemicolon : restTokens) = [TokSemicolon]
-    currentStatement n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement (n + 1) restTokens
-    currentStatement n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement (n - 1) restTokens
-    currentStatement n (token : restTokens) = token : currentStatement n restTokens
-    currentStatement _ [] = error "Run-time error"
+    currentStatement :: Token -> Int -> [Token] -> [Token]
+    currentStatement TokThen 0 (TokSemicolon : TokElse : restTokens) = [TokSemicolon]
+    currentStatement matchToken 0 (TokSemicolon : restTokens)
+      | matchToken /= TokThen = [TokSemicolon]
+      | otherwise = error "Run-time error"
+    currentStatement matchToken n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement matchToken (n + 1) restTokens
+    currentStatement matchToken n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement matchToken (n - 1) restTokens
+    currentStatement matchToken n (token : restTokens) = token : currentStatement matchToken n restTokens
+    currentStatement matchToken _ [] = error "Run-time error"
 
     -- Wrapper functions to get the condition, the current statement and the following statements for conditional and while statements
    
@@ -392,18 +395,18 @@ buildData tokens =
 
     getCurrentStatement :: Token -> [Token] -> [Stm]
     getCurrentStatement diffToken tokens =
-      buildData (currentStatement 0 (tail (dropWhile (/= diffToken) tokens)))
+      buildData (currentStatement diffToken 0 (tail (dropWhile (/= diffToken) tokens)))
 
     getNextStatements :: Token -> [Token] -> [Stm]
     getNextStatements diffToken tokens =
       buildData (nextStatements 0 (tail (dropWhile (/= diffToken) tokens)))
 ```
 
-The auxiliary functions **nextStatements** and **currentStatement** are used to process the list of **Tokens** and return the corresponding list of **Tokens** for the next statements and the current statement, respectively. These functions are also responsible for handling the bracket matching, by making sure that the number of opening brackets is equal to the number of closing brackets, while also ensuring that the statements end with a semicolon. In case any of these conditions are not met, a *run-time error* is thrown.
+The auxiliary functions *nextStatements* and *currentStatement* are used to process the list of **Tokens** and return the corresponding list of **Tokens** for the next statements and the current statement, respectively. These functions are also responsible for handling the bracket matching, by making sure that the number of opening brackets is equal to the number of closing brackets, while also ensuring that the statements end with a semicolon. In case any of these conditions are not met, a *Run-time error* is thrown. To deal with conditionals statements, the *currentStatement* function also receives a **Token** as an argument, which is used to identify the current statement. When the **matchToken** corresponds to a **TokThen**, rather than simply determining the end of the current statement by a single semicolon, the function will determine the end of the current statement by a semicolon followed by a **TokElse**. If this pattern is not matched, a *Run-time error* is thrown, since there can only be one statement within the **Then** branch.
 
-The **getCondition**, **getCurrentStatement** and **getNextStatements** wrapper functions are used to process the list of **Tokens** and return the corresponding **Bexp** for the condition, the list of **Stms** for the current statement and the list of **Stms** for the next statements, respectively. These functions are used by the **buildData** function to build the corresponding **Stms**.
+The *getCondition*, *getCurrentStatement* and *getNextStatements* wrapper functions are used to process the list of **Tokens** and return the corresponding **Bexp** for the condition, the list of **Stms** for the current statement and the list of **Stms** for the next statements, respectively. These functions are used by the *buildData* function to build the corresponding **Stms**.
 
-For the case of the assignment statement, we implemented the **isBooleanExp** and the **buildAssignment** functions to handle the assignment of different types of expressions. These functions are defined as follows:
+For the case of the assignment statement, we implemented the *isBooleanExp* and the *buildAssignment* functions to handle the assignment of different types of expressions. These functions are defined as follows:
 
 ```haskell
 -- Checks if a given list of tokens represents a boolean expression
@@ -419,11 +422,11 @@ buildAssignment tokens var
   | otherwise = AssignAx var (buildArithmetic tokens)
 ```
 
-The **isBooleanExp** function checks if the given list of **Tokens** represents a boolean expression. This is done by checking if the list of **Tokens** contains any of the boolean operators or operands.
+The *isBooleanExp* function checks if the given list of **Tokens** represents a boolean expression. This is done by checking if the list of **Tokens** contains any of the boolean operators or operands.
 
-The **buildAssignment** function receives a list of **Tokens** and a variable name. It then checks if the list of **Tokens** represents a boolean expression, by calling the **isBooleanExp** function. If it does, it calls the **buildBool** function to build the corresponding boolean expression. Otherwise, it calls the **buildArithmetic** function to build the corresponding arithmetic expression.
+The *buildAssignment* function receives a list of **Tokens** and a variable name. It then checks if the list of **Tokens** represents a boolean expression, by calling the *isBooleanExp* function. If it does, it calls the *buildBool* function to build the corresponding boolean expression. Otherwise, it calls the *buildArithmetic* function to build the corresponding arithmetic expression.
 
-The **buildArithmetic** and **buildBool** functions are defined as follows:
+The *buildArithmetic* and *buildBool* functions are defined as follows:
 
 ```haskell
 -- Builds an arithmetic expression from a given list of tokens
@@ -443,13 +446,13 @@ buildBool tokens =
     _ -> error "Run-time error"
 ```
 
-These functions allow us to parse the provided list of **Tokens** respectively into an arithmetic expression or boolean expression. They achieve this by recursively calling a sequence of functions, in which each function is responsible for parsing a specific operation or operand, by pattern matching. 
+These functions allow us to parse the provided list of **Tokens** respectively into an arithmetic expression or boolean expression. They achieve this by recursively calling a sequence of functions, in which each function is responsible for parsing a specific operation or operand, by pattern matching.
 
 The sequence is ordered from the lowest to the highest level of precedence and each function creates a call chain all the way to the function responsible for the highest precedence level, before trying to effectively match the resulting expression of the recursive call, with the current parsing function pattern. The parsing sequence starts by calling the function responsible for parsing the lowest level of precedence.
 
 Because the operand parsing functions execute the pattern matching by checking the head of the list and then parsing with the same function (same level of precedence) the rest of the tokens, the parsing process resolved the expressions with right associativity. To solve this, we decided to reverse the list of tokens before parsing, so that the expression was parsed with left associativity.
 
-By using this approach, we can simply define the **parse** function as follows:
+By using this approach, we can simply define the *parse* function as follows:
 
 ```haskell
 -- Parses a given string into a program (list of statements) for the compiler to execute
@@ -457,7 +460,7 @@ parse :: String -> Program
 parse = buildData . lexer
 ```
 
-This function receives a string and converts it into a list of **Tokens** by calling the **lexer** function. It then converts the list of **Tokens** into a list of **Stms** by calling the **buildData** function, which uses the **buildArithmetic** and **buildBool** functions to handle the parsing of expressions, according to the precedence of operations.
+This function receives a string and converts it into a list of **Tokens** by calling the *lexer* function. It then converts the list of **Tokens** into a list of **Stms** by calling the *buildData* function, which uses the *buildArithmetic* and *buildBool* functions to handle the parsing of expressions, according to the precedence of operations.
 
 In order to compile the arithmetic expressions, we implemented the following function:
 
@@ -505,8 +508,8 @@ compile (stm : program) =
     AssignBx var bexp -> compB bexp ++ [Store var] ++ compile program
     AssignAx var aexp -> compA aexp ++ [Store var] ++ compile program
     Conditional bexp stm1 stm2 ->
-      compB bexp ++ [Branch (compile stm1) (compile stm2)] ++ compile program
-    While bexp stm -> Loop (compB bexp) (compile stm) : compile program
+      compB bexp ++ [Branch (compile [stm1]) (compile [stm2])] ++ compile program
+    While bexp stm -> Loop (compB bexp) (compile [stm]) : compile program
     Seq stms -> compile stms ++ compile program
 ```
 

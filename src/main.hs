@@ -2,8 +2,6 @@
 
 import Data.Char
 import Data.List
-import Distribution.Compat.CharParsing (CharParsing (string))
-import Distribution.Simple.Setup (programDbOptions)
 
 -- Part 1
 
@@ -194,8 +192,8 @@ data Bexp
 data Stm
   = AssignBx String Bexp
   | AssignAx String Aexp
-  | Conditional Bexp [Stm] [Stm]
-  | While Bexp [Stm]
+  | Conditional Bexp Stm Stm
+  | While Bexp Stm
   | Seq [Stm]
   deriving (Show)
 
@@ -232,8 +230,8 @@ compile (stm : program) =
     AssignBx var bexp -> compB bexp ++ [Store var] ++ compile program
     AssignAx var aexp -> compA aexp ++ [Store var] ++ compile program
     Conditional bexp stm1 stm2 ->
-      compB bexp ++ [Branch (compile stm1) (compile stm2)] ++ compile program
-    While bexp stm -> Loop (compB bexp) (compile stm) : compile program
+      compB bexp ++ [Branch (compile [stm1]) (compile [stm2])] ++ compile program
+    While bexp stm -> Loop (compB bexp) (compile [stm]) : compile program
     Seq stms -> compile stms ++ compile program
 
 -- Token represents the type of tokens used by the lexer to parse the program
@@ -428,17 +426,16 @@ buildData [] = []
 buildData tokens =
   case tokens of
     (TokVar var : TokAssign : restTokens) ->
-      buildAssignment (init (currentStatement 0 restTokens)) var
+      buildAssignment (init (currentStatement TokAssign 0 restTokens)) var
         : buildData (nextStatements 0 restTokens)
     (TokOpenBracket : restTokens) ->
-      Seq (buildData (init (init (currentStatement 1 restTokens))))
+      Seq (buildData (init (init (currentStatement TokOpenBracket 1 restTokens))))
         : buildData (nextStatements 1 restTokens)
     (TokIf : restTokens) ->
-      Conditional (getCondition TokThen restTokens) (getCurrentStatement TokThen restTokens) (getCurrentStatement TokElse restTokens)
+      Conditional (getCondition TokThen restTokens) (head (getCurrentStatement TokThen restTokens)) (head (getCurrentStatement TokElse restTokens))
         : getNextStatements TokElse restTokens
     (TokWhile : restTokens) ->
-      
-      While (getCondition TokDo restTokens) (getCurrentStatement TokDo restTokens)
+      While (getCondition TokDo restTokens) (head (getCurrentStatement TokDo restTokens))
         : getNextStatements TokDo restTokens
     _ -> error "Run-time error" 
   
@@ -454,12 +451,15 @@ buildData tokens =
     nextStatements _ [] = error "Run-time error"
 
     -- Returns a list of tokens corresponding to the current statement
-    currentStatement :: Int -> [Token] -> [Token]
-    currentStatement 0 (TokSemicolon : restTokens) = [TokSemicolon]
-    currentStatement n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement (n + 1) restTokens
-    currentStatement n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement (n - 1) restTokens
-    currentStatement n (token : restTokens) = token : currentStatement n restTokens
-    currentStatement _ [] = error "Run-time error"
+    currentStatement :: Token -> Int -> [Token] -> [Token]
+    currentStatement TokThen 0 (TokSemicolon : TokElse : restTokens) = [TokSemicolon]
+    currentStatement matchToken 0 (TokSemicolon : restTokens)
+      | matchToken /= TokThen = [TokSemicolon]
+      | otherwise = error "Run-time error"
+    currentStatement matchToken n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement matchToken (n + 1) restTokens
+    currentStatement matchToken n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement matchToken (n - 1) restTokens
+    currentStatement matchToken n (token : restTokens) = token : currentStatement matchToken n restTokens
+    currentStatement matchToken _ [] = error "Run-time error"
 
     -- Wrapper functions to get the condition, the current statement and the following statements for conditional and while statements
    
@@ -468,7 +468,7 @@ buildData tokens =
 
     getCurrentStatement :: Token -> [Token] -> [Stm]
     getCurrentStatement diffToken tokens =
-      buildData (currentStatement 0 (tail (dropWhile (/= diffToken) tokens)))
+      buildData (currentStatement diffToken 0 (tail (dropWhile (/= diffToken) tokens)))
 
     getNextStatements :: Token -> [Token] -> [Stm]
     getNextStatements diffToken tokens =
@@ -477,7 +477,6 @@ buildData tokens =
 -- Parses a given string into a program (list of statements) for the compiler to execute
 parse :: String -> Program
 parse = buildData . lexer
-
 
 -- To help you test your parser
 testParser :: String -> (String, String)
@@ -498,9 +497,6 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
 -- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
--- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
--- testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
--- testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
 
 -- Custom Tests:
 -- testParser "x := not True;" == ("", "x=False")
@@ -518,5 +514,9 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := True = (1 <= 2);" == ("", "x=True")
 -- testParser "x := 1+2-3+10;" == ("","x=10")
 -- testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
+-- testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
+-- testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
 -- testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6))))) * 7;" == ("","x=-133")
 -- testParser "x := (1 + 2 * 3 - (4 * 5 + 6)) * 7;" == ("","x=-133")
+
+  
