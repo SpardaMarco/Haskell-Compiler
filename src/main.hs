@@ -2,6 +2,7 @@
 
 import Data.Char
 import Data.List
+import GHC.Conc (STM(STM))
 
 -- Part 1
 
@@ -425,54 +426,64 @@ buildData :: [Token] -> [Stm]
 buildData [] = []
 buildData tokens =
   case tokens of
-    (TokVar var : TokAssign : restTokens) ->
-      buildAssignment (init (currentStatement TokAssign 0 restTokens)) var
-        : buildData (nextStatements 0 restTokens)
-    (TokOpenBracket : restTokens) ->
-      Seq (buildData (init (init (currentStatement TokOpenBracket 1 restTokens))))
-        : buildData (nextStatements 1 restTokens)
-    (TokIf : restTokens) ->
-      Conditional (getCondition TokThen restTokens) (head (getCurrentStatement TokThen restTokens)) (head (getCurrentStatement TokElse restTokens))
-        : getNextStatements TokElse restTokens
-    (TokWhile : restTokens) ->
-      While (getCondition TokDo restTokens) (head (getCurrentStatement TokDo restTokens))
-        : getNextStatements TokDo restTokens
+    (TokVar var : TokAssign : restTokens) -> case currentStatement restTokens [] of
+      (stm, restTokens1) -> buildAssignment (init stm) var : buildData restTokens1
+    (TokOpenBracket : restTokens) -> case currentStatement restTokens [TokOpenBracket] of
+      (stm, restTokens1) -> Seq (buildData (init (init stm))) : buildData restTokens1
+    (TokIf : restTokens) -> case getCondition TokThen restTokens of
+      (bexp, restTokens1) -> case getCurrentStatement restTokens1 of
+        (stm1, restTokens2) -> case getCurrentStatement restTokens2 of
+          (stm2, restTokens3) -> Conditional bexp (head stm1) (head stm2) : buildData restTokens3
+    (TokWhile : restTokens) -> case getCondition TokDo restTokens of
+      (bexp, restTokens1) -> case getCurrentStatement restTokens1 of
+        (stm, restTokens2) -> While bexp (head stm) : buildData restTokens2
     _ -> error "Run-time error" 
   
   where
     -- Auxiliary functions
 
-    -- Returns a list of tokens corresponding to the statements after the current statement
-    nextStatements :: Int -> [Token] -> [Token]
-    nextStatements 0 (TokSemicolon : restTokens) = restTokens
-    nextStatements n (TokOpenBracket : restTokens) = nextStatements (n + 1) restTokens
-    nextStatements n (TokCloseBracket : restTokens) = nextStatements (n - 1) restTokens
-    nextStatements n (_ : restTokens) = nextStatements n restTokens
-    nextStatements _ [] = error "Run-time error"
-
-    -- Returns a list of tokens corresponding to the current statement
-    currentStatement :: Token -> Int -> [Token] -> [Token]
-    currentStatement TokThen 0 (TokSemicolon : TokElse : restTokens) = [TokSemicolon]
-    currentStatement matchToken 0 (TokSemicolon : restTokens)
-      | matchToken /= TokThen = [TokSemicolon]
-      | otherwise = error "Run-time error"
-    currentStatement matchToken n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement matchToken (n + 1) restTokens
-    currentStatement matchToken n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement matchToken (n - 1) restTokens
-    currentStatement matchToken n (token : restTokens) = token : currentStatement matchToken n restTokens
-    currentStatement matchToken _ [] = error "Run-time error"
+    currentStatement :: [Token] -> [Token] -> ([Token], [Token])
+    currentStatement (TokSemicolon : restTokens) [] = ([TokSemicolon], restTokens)
+    currentStatement (TokOpenBracket : restTokens) stack = 
+      let (current, next) = currentStatement restTokens (TokOpenBracket : stack)
+      in (TokOpenBracket : current, next)
+    currentStatement (TokCloseBracket : restTokens) (TokOpenBracket : stack) =
+      let (current, next) = currentStatement restTokens stack
+      in (TokCloseBracket : current, next)
+    currentStatement (TokCloseBracket : restTokens) _ = error "Run-time error"
+    currentStatement (TokIf : restTokens) stack = 
+      let (current, next) = currentStatement restTokens (TokIf : stack)
+      in (TokIf : current, next)
+    currentStatement (TokThen : restTokens) (TokIf : stack) = 
+      let (current, next) = currentStatement restTokens (TokThen : TokIf : stack)
+      in (TokThen : current, next)
+    currentStatement (TokThen : restTokens) _ = error "Run-time error"
+    currentStatement (TokElse : restTokens) (TokThen : TokIf : stack) = 
+      let (current, next) = currentStatement restTokens stack
+      in (TokElse : current, next)
+    currentStatement (TokElse : restTokens) _ = error "Run-time error"
+    currentStatement (TokWhile : restTokens) stack = 
+      let (current, next) = currentStatement restTokens (TokWhile : stack)
+      in (TokWhile : current, next)
+    currentStatement (TokDo : restTokens) (TokWhile : stack) = 
+      let (current, next) = currentStatement restTokens stack
+      in (TokDo : current, next)
+    currentStatement (TokDo : restTokens) _ = error "Run-time error"
+    currentStatement (token : restTokens) stack = 
+      let (current, next) = currentStatement restTokens stack
+      in (token : current, next)
+    currentStatement [] stack = error "Run-time error"
 
     -- Wrapper functions to get the condition, the current statement and the following statements for conditional and while statements
-   
-    getCondition :: Token -> [Token] -> Bexp
-    getCondition diffToken tokens = buildBool (takeWhile (/= diffToken) tokens)
 
-    getCurrentStatement :: Token -> [Token] -> [Stm]
-    getCurrentStatement diffToken tokens =
-      buildData (currentStatement diffToken 0 (tail (dropWhile (/= diffToken) tokens)))
+    getCondition :: Token -> [Token] -> (Bexp, [Token])
+    getCondition diffToken tokens = (buildBool (takeWhile (/= diffToken) tokens), dropWhile (/= diffToken) tokens)
 
-    getNextStatements :: Token -> [Token] -> [Stm]
-    getNextStatements diffToken tokens =
-      buildData (nextStatements 0 (tail (dropWhile (/= diffToken) tokens)))
+    getCurrentStatement :: [Token] -> ([Stm], [Token])
+    getCurrentStatement tokens = 
+      let (current, rest) = currentStatement (tail tokens) []
+      in (buildData current, rest)
+
 
 -- Parses a given string into a program (list of statements) for the compiler to execute
 parse :: String -> Program
@@ -518,5 +529,102 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
 -- testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6))))) * 7;" == ("","x=-133")
 -- testParser "x := (1 + 2 * 3 - (4 * 5 + 6)) * 7;" == ("","x=-133")
+-- testParser "if True then if False then x := 1; else x := 2; else x := 3;" == ("","x=2")
+-- testParser "x := 0; while x <= 5 do (y := 0; while y <= 5 do (y := y + 1;); x := x + 1;);" == ("","x=6,y=6")
+-- testParser "x := 1; while x <= 5 do if True then x := x + 1; else x := x + 2;" == ("","x=6")
+-- testParser "x := 1; if False then x := 1; else while x <= 5 do x := x + 1;" == ("","x=6")
+-- testParser "x := 1; if True then while x <= 5 do x := x + 1; else x := 1;" == ("","x=6")
+-- testParser "(x := 1; y := 1; while (x <= 3) do (y := 2 * y; x := x + 1; z := 0; while (z <= 2) do (y := y + 1; z := z + 1;);););" == ("","x=4,y=29,z=3")
+-- testParser "if True then (if False then x:=1; else ((x := 1; y := 1; while (x <= 3) do (y := 2 * y; x := x + 1; z := 0; while (z <= 2) do (y := y + 1; z := z + 1;);););w:=1;);); else y:=1;" == ("","w=1,x=4,y=29,z=3")
 
-  
+
+-- buildData :: [Token] -> [Stm]
+-- buildData [] = []
+-- buildData tokens =
+--   case tokens of
+--     (TokVar var : TokAssign : restTokens) ->
+--       buildAssignment (init (currentStatementWrapper restTokens)) var
+--         : buildData (nextStatementsWrapper restTokens)
+--     (TokOpenBracket : restTokens) ->
+--       Seq (buildData (init (init (tail (currentStatementWrapper (TokOpenBracket : restTokens))))))
+--         : buildData (nextStatementsWrapper (TokOpenBracket : restTokens))
+--     (TokIf : restTokens) ->
+--       Conditional (getCondition TokThen restTokens) (Seq (buildData (getPartialStatementWrapper TokThen (TokIf : restTokens)))) (Seq (buildData (getPartialStatementWrapper TokElse (TokIf : restTokens))))
+--         : buildData (nextStatementsWrapper (TokIf : restTokens))
+--     (TokWhile : restTokens) ->
+--       While (getCondition TokDo restTokens) (Seq (buildData (getPartialStatementWrapper TokDo (TokWhile : restTokens))))
+--         : buildData (nextStatementsWrapper (TokWhile : restTokens))
+--     _ -> error "Run-time error"
+
+--   where
+--     -- Auxiliary functions
+--     nextStatementsWrapper :: [Token] -> [Token]
+--     nextStatementsWrapper = nextStatements []
+
+--     currentStatementWrapper :: [Token] -> [Token]
+--     currentStatementWrapper = currentStatement []
+
+--     -- Returns a list of tokens corresponding to the statements after the current statement
+--     nextStatements :: [Token] -> [Token] -> [Token]
+--     nextStatements [] (TokSemicolon : restTokens) = restTokens
+--     nextStatements stack (TokSemicolon : restTokens) = nextStatements stack restTokens
+--     nextStatements stack (TokOpenBracket : restTokens) = nextStatements (TokOpenBracket : stack) restTokens
+--     nextStatements (TokOpenBracket : stack) (TokCloseBracket : restTokens) = nextStatements stack restTokens
+--     nextStatements _ (TokCloseBracket : restTokens) = error "Run-time error"
+--     nextStatements stack (TokIf : restTokens) = nextStatements (TokThen : stack) restTokens
+--     nextStatements (TokThen : stack) (TokThen : restTokens) = nextStatements ( TokElse : stack) restTokens
+--     nextStatements _ (TokThen : restTokens) = error "Run-time error"
+--     nextStatements (TokElse : stack) (TokElse : restTokens) = nextStatements stack restTokens
+--     nextStatements _ (TokElse : restTokens) = error "Run-time error"
+--     nextStatements stack (TokWhile : restTokens) = nextStatements (TokDo : stack) restTokens
+--     nextStatements (TokDo : stack) (TokDo : restTokens) = nextStatements stack restTokens
+--     nextStatements _ (TokDo : restTokens) = error "Run-time error"
+--     nextStatements stack (_ : restTokens) = nextStatements stack restTokens
+--     nextStatements _ [] = error "Run-time error"
+
+--     -- Returns a list of tokens corresponding to the current statement
+--     currentStatement :: [Token] -> [Token] -> [Token]
+--     currentStatement [] (TokSemicolon : restTokens) = [TokSemicolon]
+--     currentStatement stack (TokSemicolon : restTokens) = TokSemicolon : currentStatement stack restTokens
+--     currentStatement [] (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement [TokOpenBracket] restTokens
+--     currentStatement stack (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement (TokOpenBracket : stack) restTokens
+--     currentStatement (TokOpenBracket : stack) (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement stack restTokens
+--     currentStatement _ (TokCloseBracket : restTokens) = error "Run-time error"
+--     currentStatement stack (TokIf : restTokens) = TokIf : currentStatement (TokThen : stack) restTokens
+--     currentStatement (TokThen : stack) (TokThen : restTokens) = TokThen : currentStatement (TokElse : stack) restTokens
+--     currentStatement _ (TokThen : restTokens) = error "Run-time error"
+--     currentStatement (TokElse : stack) (TokElse : restTokens) = TokElse : currentStatement stack restTokens
+--     currentStatement _ (TokElse : restTokens) = error "Run-time error"
+--     currentStatement stack (TokWhile : restTokens) = TokWhile : currentStatement (TokDo : stack) restTokens
+--     currentStatement (TokDo : stack) (TokDo : restTokens) = TokDo : currentStatement stack restTokens
+--     currentStatement _ (TokDo : restTokens) = error "Run-time error"
+--     currentStatement stack (token : restTokens) = token : currentStatement stack restTokens
+--     currentStatement _ [] = error "Run-time error"
+
+--     getCondition :: Token -> [Token] -> Bexp
+--     getCondition diffToken tokens = buildBool (takeWhile (/= diffToken) tokens)
+
+--     getPartialStatementWrapper :: Token -> [Token] -> [Token]
+--     getPartialStatementWrapper diffToken (TokIf : restTokens) = currentStatementWrapper (getPartialStatement [TokThen] diffToken restTokens)
+--     getPartialStatementWrapper diffToken (TokWhile : restTokens) = currentStatementWrapper (getPartialStatement [TokDo] diffToken restTokens)
+
+--     getPartialStatement :: [Token] -> Token -> [Token] -> [Token]
+--     getPartialStatement  [] _ tokens = tokens
+--     getPartialStatement stack diffToken (TokSemicolon : restTokens) = getPartialStatement stack diffToken restTokens
+--     getPartialStatement stack diffToken (TokOpenBracket : restTokens) = getPartialStatement (TokOpenBracket : stack) diffToken restTokens
+--     getPartialStatement (TokOpenBracket : stack) diffToken (TokCloseBracket : restTokens) = getPartialStatement stack diffToken restTokens
+--     getPartialStatement _ _ (TokCloseBracket : restTokens) = error "Run-time error"
+--     getPartialStatement stack diffToken (TokIf : restTokens) = getPartialStatement (TokThen : stack) diffToken restTokens
+--     getPartialStatement (TokThen : stack) TokThen (TokThen : restTokens) = getPartialStatement stack TokThen restTokens
+--     getPartialStatement (TokThen : stack) diffToken (TokThen : restTokens) = getPartialStatement (TokElse : stack) diffToken restTokens
+--     getPartialStatement _ _ (TokThen : restTokens) = error "Run-time error"
+--     getPartialStatement (TokElse : stack) TokElse (TokElse : restTokens) = getPartialStatement stack TokElse restTokens
+--     getPartialStatement (TokElse : stack) diffToken (TokElse : restTokens) = getPartialStatement stack diffToken restTokens
+--     getPartialStatement _ _ (TokElse : restTokens) = error "Run-time error"
+--     getPartialStatement stack diffToken (TokWhile : restTokens) = getPartialStatement (TokDo : stack) diffToken restTokens
+--     getPartialStatement (TokDo : stack) TokDo (TokDo : restTokens) = getPartialStatement stack TokDo restTokens
+--     getPartialStatement (TokDo : stack) diffToken (TokDo : restTokens) = getPartialStatement stack diffToken restTokens
+--     getPartialStatement _ _ (TokDo : restTokens) = error "Run-time error"
+--     getPartialStatement stack diffToken (token : restTokens) = getPartialStatement stack diffToken restTokens
+--     getPartialStatement _ _ [] = error "Run-time error"
+
