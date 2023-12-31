@@ -347,64 +347,95 @@ The *buildData* function is defined as follows:
 
 ```haskell
 -- Builds a program from a given list of tokens
--- Builds a program from a given list of tokens
-buildData :: [Token] -> [Stm]
+buildData :: [Token] -> Program
 buildData [] = []
 buildData tokens =
   case tokens of
-    (TokVar var : TokAssign : restTokens) ->
-      buildAssignment (init (currentStatement TokAssign 0 restTokens)) var
-        : buildData (nextStatements 0 restTokens)
-    (TokOpenBracket : restTokens) ->
-      Seq (buildData (init (init (currentStatement TokOpenBracket 1 restTokens))))
-        : buildData (nextStatements 1 restTokens)
-    (TokIf : restTokens) ->
-      Conditional (getCondition TokThen restTokens) (head (getCurrentStatement TokThen restTokens)) (head (getCurrentStatement TokElse restTokens))
-        : getNextStatements TokElse restTokens
-    (TokWhile : restTokens) ->
-      While (getCondition TokDo restTokens) (head (getCurrentStatement TokDo restTokens))
-        : getNextStatements TokDo restTokens
+    (TokVar var : TokAssign : restTokens) -> 
+      case currentStatement restTokens [] of
+        Just (stm, restTokens1) -> buildAssignment (init stm) var : buildData restTokens1
+        Nothing -> error "Run-time error"
+    (TokOpenBracket : restTokens) -> 
+      case currentStatement restTokens [TokOpenBracket] of
+        Just (stm, restTokens1) -> Seq (buildData (init (init stm))) : buildData restTokens1
+        Nothing -> error "Run-time error"
+    (TokIf : restTokens) -> 
+      case getCondition TokThen restTokens of
+        (bexp, restTokens1) -> case getCurrentStatement restTokens1 of
+          Just (stm1, restTokens2) -> case getCurrentStatement restTokens2 of
+            Just (stm2, restTokens3) -> Conditional bexp (head stm1) (head stm2) : buildData restTokens3
+            Nothing -> error "Run-time error"
+          Nothing -> error "Run-time error"
+    (TokWhile : restTokens) -> 
+      case getCondition TokDo restTokens of
+        (bexp, restTokens1) -> case getCurrentStatement restTokens1 of
+            Just (stm, restTokens2) -> While bexp (head stm) : buildData restTokens2
+            Nothing -> error "Run-time error"
     _ -> error "Run-time error" 
   
   where
     -- Auxiliary functions
 
-    -- Returns a list of tokens corresponding to the statements after the current statement
-    nextStatements :: Int -> [Token] -> [Token]
-    nextStatements 0 (TokSemicolon : restTokens) = restTokens
-    nextStatements n (TokOpenBracket : restTokens) = nextStatements (n + 1) restTokens
-    nextStatements n (TokCloseBracket : restTokens) = nextStatements (n - 1) restTokens
-    nextStatements n (_ : restTokens) = nextStatements n restTokens
-    nextStatements _ [] = error "Run-time error"
+    -- Retrieves the respective list of tokens for the first (current) statement, along with the list of the following tokens
+    currentStatement :: [Token] -> [Token] -> Maybe ([Token], [Token])
+    currentStatement (TokSemicolon : restTokens) [] = Just ([TokSemicolon], restTokens)
+    currentStatement (TokOpenBracket : restTokens) stack = 
+      case currentStatement restTokens (TokOpenBracket : stack) of
+        Just (current, next) -> Just (TokOpenBracket : current, next)
+        Nothing -> Nothing
+    currentStatement (TokCloseBracket : restTokens) (TokOpenBracket : stack) =
+      case currentStatement restTokens stack of
+        Just (current, next) -> Just (TokCloseBracket : current, next)
+        Nothing -> Nothing
+    currentStatement (TokCloseBracket : restTokens) _ = Nothing
+    currentStatement (TokIf : restTokens) stack = 
+      case currentStatement restTokens (TokIf : stack) of
+        Just (current, next) -> Just (TokIf : current, next)
+        Nothing -> Nothing
+    currentStatement (TokThen : restTokens) (TokIf : stack) = 
+      case currentStatement restTokens (TokThen : TokIf : stack) of
+        Just (current, next) -> Just (TokThen : current, next)
+        Nothing -> Nothing
+    currentStatement (TokThen : restTokens) _ = Nothing
+    currentStatement (TokElse : restTokens) (TokThen : TokIf : stack) = 
+      case currentStatement restTokens stack of
+        Just (current, next) -> Just (TokElse : current, next)
+        Nothing -> Nothing
+    currentStatement (TokElse : restTokens) _ = Nothing
+    currentStatement (TokWhile : restTokens) stack = 
+      case currentStatement restTokens (TokWhile : stack) of
+        Just (current, next) -> Just (TokWhile : current, next)
+        Nothing -> Nothing
+    currentStatement (TokDo : restTokens) (TokWhile : stack) = 
+      case currentStatement restTokens stack of
+        Just (current, next) -> Just (TokDo : current, next)
+        Nothing -> Nothing
+    currentStatement (TokDo : restTokens) _ = Nothing
+    currentStatement (token : restTokens) stack = 
+      case currentStatement restTokens stack of
+        Just (current, next) -> Just (token : current, next)
+        Nothing -> Nothing
+    currentStatement [] stack = Nothing
 
-    -- Returns a list of tokens corresponding to the current statement
-    currentStatement :: Token -> Int -> [Token] -> [Token]
-    currentStatement TokThen 0 (TokSemicolon : TokElse : restTokens) = [TokSemicolon]
-    currentStatement matchToken 0 (TokSemicolon : restTokens)
-      | matchToken /= TokThen = [TokSemicolon]
-      | otherwise = error "Run-time error"
-    currentStatement matchToken n (TokOpenBracket : restTokens) = TokOpenBracket : currentStatement matchToken (n + 1) restTokens
-    currentStatement matchToken n (TokCloseBracket : restTokens) = TokCloseBracket : currentStatement matchToken (n - 1) restTokens
-    currentStatement matchToken n (token : restTokens) = token : currentStatement matchToken n restTokens
-    currentStatement matchToken _ [] = error "Run-time error"
+    -- Retrieves the first (current) boolean expresion for a given list of tokens, along with the list of the following tokens  
+    getCondition :: Token -> [Token] -> (Bexp, [Token])
+    getCondition diffToken tokens = (buildBool (takeWhile (/= diffToken) tokens), dropWhile (/= diffToken) tokens)
 
-    -- Wrapper functions to get the condition, the current statement and the following statements for conditional and while statements
-   
-    getCondition :: Token -> [Token] -> Bexp
-    getCondition diffToken tokens = buildBool (takeWhile (/= diffToken) tokens)
-
-    getCurrentStatement :: Token -> [Token] -> [Stm]
-    getCurrentStatement diffToken tokens =
-      buildData (currentStatement diffToken 0 (tail (dropWhile (/= diffToken) tokens)))
-
-    getNextStatements :: Token -> [Token] -> [Stm]
-    getNextStatements diffToken tokens =
-      buildData (nextStatements 0 (tail (dropWhile (/= diffToken) tokens)))
+    -- Retrieves the first (current) statement for a given list of tokens, along with the list of the following tokens
+    getCurrentStatement :: [Token] -> Maybe ([Stm], [Token])
+    getCurrentStatement tokens = 
+      case currentStatement (tail tokens) [] of
+        Just (current, next) -> Just (buildData current, next)
+        Nothing -> Nothing
 ```
 
-The auxiliary functions *nextStatements* and *currentStatement* are used to process the list of **Tokens** and return the corresponding list of **Tokens** for the next statements and the current statement, respectively. These functions are also responsible for handling the bracket matching, by making sure that the number of opening brackets is equal to the number of closing brackets, while also ensuring that the statements end with a semicolon. In case any of these conditions are not met, a *Run-time error* is thrown. To deal with conditionals statements, the *currentStatement* function also receives a **Token** as an argument, which is used to identify the current statement. When the **matchToken** corresponds to a **TokThen**, rather than simply determining the end of the current statement by a single semicolon, the function will determine the end of the current statement by a semicolon followed by a **TokElse**. If this pattern is not matched, a *Run-time error* is thrown, since there can only be one statement within the **Then** branch.
+This function receives a list of **Tokens** and converts it into a list of **Stms**. It achieves this by performing pattern matching of the first **Tokens** of the list. It then determines, for each type of statement, the respective arguments through the use of the auxiliary functions: *currentStatement*, *getCondition* and *getCurrentStatement*.
 
-The *getCondition*, *getCurrentStatement* and *getNextStatements* wrapper functions are used to process the list of **Tokens** and return the corresponding **Bexp** for the condition, the list of **Stms** for the current statement and the list of **Stms** for the next statements, respectively. These functions are used by the *buildData* function to build the corresponding **Stms**.
+The *currentStatement* function is responsible for retrieving the respective list of **Tokens** for the first statement in the list, along with the list of the following and remaining **Tokens**. It achieves this by recursively calling itself, while keeping track of the **Tokens** that have been processed, and the **Tokens** that are still to be processed. It uses a stack to keep track of statements that are inside brackets, if statements or while statements, in a PDA-like fashion, thus allowing it to handle nested statements.
+
+The *getCondition* function is responsible for retrieving the first boolean expression in the list of **Tokens**, along with the list of the following and remaining **Tokens**. It achieves this by taking the **Tokens** until it finds a token that corresponds to the end of the boolean expression, which is passed as an argument to the function.
+
+The *getCurrentStatement* function is tasked with obtaining the initial statement from a list of **Tokens**, along with the subsequent and remaining **Tokens**. It accomplishes this by invoking the *currentStatement* function with an empty stack and the list of **Tokens** excluding the first one. In this particular context, the omission of the first token corresponds to either a **TokThen**, **TokElse**, or **TokDo**, each of which serves as an indicator for specific branching or looping conditions within the subsequent statements. Following this, the *buildData* function is called to construct the corresponding **Stms**.
 
 For the case of the assignment statement, we implemented the *isBooleanExp* and the *buildAssignment* functions to handle the assignment of different types of expressions. These functions are defined as follows:
 
@@ -542,12 +573,6 @@ ghci> testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=
 True
 ghci> testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
 True
-ghci> testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
-True
-ghci> testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
-True
-ghci> testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
-True
 ghci> testParser "x := not True;" == ("", "x=False")
 True
 ghci> testParser "x := True and False;" == ("", "x=False")
@@ -578,9 +603,29 @@ ghci> testParser "x := 1+2-3+10;" == ("","x=10")
 True
 ghci> testParser "x := ((1)+(2) * 3 - (4 * 5) + (((6)))) * 7;" == ("","x=-49")
 True
+ghci> testParser "x := (1 + 2 * 3 - 4 * 5 + 6) * 7;" == ("","x=-49")
+True
+ghci> testParser "x := (1 + (2 * 3) - (4 * 5) + 6) * 7;" == ("","x=-49")
+True
 ghci> testParser "x := ((1)+(2) * 3 - ((4 * 5) + (((6))))) * 7;" == ("","x=-133")
 True
 ghci> testParser "x := (1 + 2 * 3 - (4 * 5 + 6)) * 7;" == ("","x=-133")
+True
+ghci> testParser "if True then if False then x := 1; else x := 2; else x := 3;" == ("","x=2")
+True
+ghci> testParser "x := 0; while x <= 5 do (y := 0; while y <= 5 do (y := y + 1;); x := x + 1;);" == ("","x=6,y=6")
+True
+ghci> testParser "x := 1; while x <= 5 do if True then x := x + 1; else x := x + 2;" == ("","x=6")
+True
+ghci> testParser "x := 1; if False then x := 1; else while x <= 5 do x := x + 1;" == ("","x=6")
+True
+ghci> testParser "x := 1; if True then while x <= 5 do x := x + 1; else x := 1;" == ("","x=6")
+True
+ghci> testParser "(x := 1; y := 1; while (x <= 3) do (y := 2 * y; x := x + 1; z := 0; while (z <= 2) do (y := y + 1; z := z + 1;);););" == ("","x=4,y=29,z=3")
+True
+ghci> testParser "if True then (if False then x:=1; else ((x := 1; y := 1; while (x <= 3) do (y := 2 * y; x := x + 1; z := 0; while (z <= 2) do (y := y + 1; z := z + 1;);););w:=1;);); else y:=1;" == ("","w=1,x=4,y=29,z=3")
+True
+testParser "x := 1; if True then (if False then x:=1; else ((x := 1; y := 1; while (x <= 3) do (if True then a:=1; else b:=2; y := 2 * y; x := x + 1; z := 0; while (z <= 2) do (y := y + 1; z := z + 1;);););w:=1;);); else y:=1;" == ("","a=1,w=1,x=4,y=29,z=3")
 True
 ```
 
@@ -588,4 +633,4 @@ True
 
 The assembler, compiler and parser were fully implemented as expected. The Haskell program is able to process the provided code and produce the expected results, both for the tests provided by the pratical assignment template, and for the tests we implemented.
 
-During the development of this assignment, we were able to learn more about the Haskell programming language, as well as the functional programming paradigm. We were also able to learn more about the implementation of assemblers, compilers and parsers, which allowed us to better understand how programming languages are processed and executed. The component that stood out as the most challenging was the parser, due to the complexity of the parsing functions and the need to handle the precedence of the operations.
+During the development of this assignment, we were able to learn more about the Haskell programming language, as well as the functional programming paradigm. We were also able to learn more about the implementation of assemblers, compilers and parsers, which allowed us to better understand how programming languages are processed and executed. The components that stood out as the most challenging was the parser, due to the complexity of the parsing functions and the need to handle the precedence of the operations, along with the implementation of nested loops and conditional statements, due to the challenge of determining the respective nested statements, while keeping track of the remaining ones and ensuring correct parsing.
