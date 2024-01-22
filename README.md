@@ -3,6 +3,7 @@
 ## Group Description
 
 Group Name: **T03_G10**
+Grade: 19,28
 
 Group Members:
 
